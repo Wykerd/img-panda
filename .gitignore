@@ -1,0 +1,9 @@
+build/
+.tests/
+.vscode/
+*.png
+*.bmp
+*.jpg
+*.jpeg
+*.db
+deps/simdjson/

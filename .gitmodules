@@ -1,0 +1,9 @@
+[submodule "deps/lexbor"]
+	path = deps/lexbor
+	url = https://github.com/lexbor/lexbor.git
+[submodule "deps/llhttp"]
+	path = deps/llhttp
+	url = https://github.com/nodejs/llhttp
+[submodule "deps/hashmap"]
+	path = deps/hashmap
+	url = https://github.com/tidwall/hashmap.c.git
