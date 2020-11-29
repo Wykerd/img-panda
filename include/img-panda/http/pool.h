@@ -20,9 +20,7 @@ struct imp_http_worker_s {
     imp_http_client_t client;
 
     // Events
-    imp_http_pool_cb _on_complete; // Internal use only
     imp_http_pool_cb on_complete;
-    imp_http_pool_status_cb _on_response; // Internal use only
     imp_http_pool_status_cb on_response;
 
     // Redirect
@@ -49,6 +47,7 @@ typedef struct imp_http_worker_list_s {
     size_t len;
 } imp_http_worker_list_t;
 
+// requests are freed automatically
 typedef struct imp_http_worker_request_s {
     imp_buf_t *request; // buffer content and buffer itself is freed internally!
     imp_url_t *url; // url is to be duped as it is freed internally!
