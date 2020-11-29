@@ -113,7 +113,6 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
 
             req->on_response = imp__wc_ident_wordpress_cb;
 
-            puts("WORDPRESS IDENT");
             imp_http_pool_request(&state->pool, req);
         }
         break;
@@ -126,7 +125,7 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
         break;
     }
 
-    puts("??? Destroying initial HTML document\n");
+    puts("*** Destroying initial HTML document");
 
     lxb_html_document_destroy (document);
 

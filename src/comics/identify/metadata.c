@@ -51,7 +51,7 @@ void imp_wc_meta_strip_free (imp_wc_meta_strip_t *page) {
 
 inline
 static imp_wc_err_t imp__comic_logo_locate (imp_wc_meta_index_t *page, lxb_html_document_t *document, imp_url_t* url) {
-    puts("\n>>> IDENTIFYING LOGO");
+    puts(">>> IDENTIFYING LOGO");
     lxb_status_t status;
     lxb_dom_collection_t *headers;
 
