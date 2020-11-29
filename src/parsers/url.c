@@ -159,6 +159,19 @@ fail_path:
 #undef url_field_len
 #undef url_field_off
 
+imp_url_t *imp_url_clone (imp_url_t *url) {
+    imp_url_t *uri = malloc(sizeof(imp_url_t));
+    uri->fragment = strdup(url->fragment);
+    uri->host = strdup(url->host);
+    uri->path = strdup(url->path);
+    uri->port = strdup(url->port);
+    uri->query = strdup(url->query);
+    uri->schema = strdup(url->schema);
+    uri->userinfo = strdup(url->userinfo);
+    uri->ref = 1;
+    return uri;
+}
+
 imp_url_t *imp_url_dup (imp_url_t *url) {
     url->ref++;
     return url;

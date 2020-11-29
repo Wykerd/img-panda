@@ -29,6 +29,7 @@ typedef struct imp_url_s {
 
 imp_url_t *imp_parse_url (const char* buf, size_t buflen);
 imp_url_t *imp_url_dup(imp_url_t *url);
+imp_url_t *imp_url_clone (imp_url_t *url);
 void imp_url_free (imp_url_t *url);
 
 #ifdef __cplusplus

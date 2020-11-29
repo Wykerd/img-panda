@@ -20,7 +20,7 @@ static void imp__wc_initial_easel_page_cb (imp_http_worker_t *worker, imp_http_p
     if (status != LXB_STATUS_OK)
         goto fail;
 
-    imp_wc_comic_easel_crawl (state, document, worker->client.url);
+    imp_wc_comic_easel_crawl(state, document, worker->client.url);
 
 fail:
     // TODO FAIL
@@ -32,42 +32,6 @@ static void imp__wc_ident_wordpress_cb (imp_http_worker_t *worker, imp_http_pool
     imp_wc_indexer_state_t* state = pool->data;
     // TODO ERROR CHECK
     imp_parse_wordpress_site_info_json(&state->metadata, (imp_buf_t *)&worker->last_response);
-
-    switch (state->metadata.plugin.data)
-    {
-    case META_CMS_PL_COMICPRESS:
-    case META_CMS_PL_COMIC_EASEL:
-        {
-            imp_url_path_t path = {
-                .path = "/",
-                .query = "latest",
-                .fragment = "",
-                .userinfo = ""
-            };
-
-            imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
-
-            req->url = imp_url_dup(state->url);
-
-            imp_http_request_t *http_req = imp_http_request_init(NULL, "GET");
-    
-            imp_http_headers_push(&http_req->headers, "Host", state->url->host);
-            imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
-            imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
-
-            req->request = (imp_buf_t *)imp_http_request_serialize_with_path(http_req, NULL, (imp_url_path_t *)req->url);
-
-            req->on_response = imp__wc_initial_easel_page_cb;
-
-            imp_http_request_free(http_req);
-
-            imp_http_pool_request(&state->pool, req);
-        }
-        break;
-    
-    default:
-        break;
-    }
 }
 
 static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
@@ -91,29 +55,53 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
     {
     case META_CMS_WORDPRESS:
         {
-            imp_url_path_t path = {
-                .path = "/wp-json",
-                .query = "",
-                .fragment = "",
-                .userinfo = ""
-            };
             imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
 
-            req->url = imp_url_dup(state->url);
+            req->url = imp_url_clone(state->url);
+            free(req->url->path);
+            req->url->path = strdup("/wp-json");
 
-            imp_http_request_t *http_req = imp_http_request_init(NULL, "GET");
+            imp_http_request_t *http_req = imp_http_request_init("GET");
     
-            imp_http_headers_push(&http_req->headers, "Host", state->url->host);
             imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
             imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
 
-            req->request = (imp_buf_t *)imp_http_request_serialize_with_path(http_req, NULL, (imp_url_path_t *)req->url);
-
-            imp_http_request_free(http_req);
+            req->request = http_req;
 
             req->on_response = imp__wc_ident_wordpress_cb;
 
             imp_http_pool_request(&state->pool, req);
+
+            switch (state->metadata.plugin.data)
+            {
+            case META_CMS_PL_COMICPRESS:
+            case META_CMS_PL_COMIC_EASEL:
+                {
+
+                    imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
+
+                    req->url = imp_url_clone(state->url);
+                    free(req->url->path);
+                    req->url->path = strdup("/");
+                    free(req->url->query);
+                    req->url->query = strdup("latest");
+
+                    imp_http_request_t *http_req = imp_http_request_init("GET");
+
+                    imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
+                    imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
+
+                    req->request = http_req;
+
+                    req->on_response = imp__wc_initial_easel_page_cb;
+
+                    imp_http_pool_request(&state->pool, req);
+                }
+                break;
+            
+            default:
+                break;
+            }
         }
         break;
     
@@ -162,18 +150,15 @@ int imp_wc_indexer_run (
 
     state->url = imp_url_dup(req->url);
 
-    imp_http_request_t *http_req = imp_http_request_init(NULL, "GET");
+    imp_http_request_t *http_req = imp_http_request_init("GET");
     
-    imp_http_headers_push(&http_req->headers, "Host", req->url->host);
     imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
     imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
 
-    req->request = (imp_buf_t *)imp_http_request_serialize_with_path(http_req, NULL, (imp_url_path_t *)req->url);
+    req->request = http_req;
 
     req->on_response = imp__wc_identify_cb;
     // req->on_complete
-
-    imp_http_request_free(http_req);
 
     imp_http_pool_request(&state->pool, req);
 

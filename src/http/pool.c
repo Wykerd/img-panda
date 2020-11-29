@@ -8,7 +8,7 @@ static void imp__http_pool_write_cb (imp_http_client_t *client, imp_net_status_t
         // TODO ERROR
     };
     imp_http_worker_t *state = client->data;
-    imp_http_request_serialize_free(state->last_request);
+    imp_http_request_serialize_free(state->last_request_buf);
 };
 
 static int imp__wc_on_status_recv (llhttp_t* parser, const char *at, size_t length) {
@@ -25,7 +25,8 @@ static void imp__http_pool_ready_cb (imp_http_client_t *client) {
     imp_http_worker_t *state = client->data;
     printf("*** WORKER %p CONNECTED IN POOL\n", state);
     state->is_connected = 1;
-    imp_http_client_write(client, state->last_request, imp__http_pool_write_cb);
+    state->last_request_buf = imp_http_request_serialize_with_url(state->last_request, state->last_request_body, state->client.url);
+    imp_http_client_write(client, state->last_request_buf, imp__http_pool_write_cb);
 }
 
 static void imp__http_pool_status_cb (imp_http_client_t *client, imp_net_status_t *err) {
@@ -145,16 +146,19 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
         puts("*** CONSUMING QUEUED REQUEST");
         imp_http_worker_request_t *req = state->pool->queue[state->pool->queue_len - 1];
 
-        state->last_request = (uv_buf_t *)req->request;
+        state->last_request = req->request;
         state->on_complete = req->on_complete;
         state->on_response = req->on_response;
+        state->last_request_body = req->body;
 
         if (!strcmp(req->url->host, state->client.url->host)) {
             // has same host
+            imp_url_free(state->client.url);
             state->client.url = req->url;
             imp_http_client_connect(&state->client, imp__http_pool_status_cb, imp__http_pool_ready_cb);
         } else {
             // not same host close and reconnect
+            imp_url_free(state->client.url);
             state->client.url = req->url;
             imp_http_client_shutdown (&state->client, imp__pool_on_close_new_host);
         }
@@ -166,6 +170,9 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
         // move to the idle pool
         state = imp__http_pool_set_idle(state->pool, &state);
     };
+
+    // free the request - we have handled it now
+    imp_http_request_free(state->last_request);
     
 cleanup:
     // reset the buffer
@@ -261,11 +268,18 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
                 !strcmp(request->url->host, pool->idle_workers.workers[i]->client.url->host)) 
             {
                 // request can be submitted immediately
-                pool->idle_workers.workers[i]->last_request = (uv_buf_t *)request->request;
+                pool->idle_workers.workers[i]->last_request = request->request;
                 pool->idle_workers.workers[i]->on_complete = request->on_complete;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
-                imp_url_free(request->url);
-                imp_http_client_write(&pool->idle_workers.workers[i]->client, (uv_buf_t *)request->request, imp__http_pool_write_cb);
+                if (pool->idle_workers.workers[i]->client.url != NULL)
+                    imp_url_free(pool->idle_workers.workers[i]->client.url);
+
+                pool->idle_workers.workers[i]->client.url = request->url;
+                pool->idle_workers.workers[i]->last_request_body = request->body;
+
+                pool->idle_workers.workers[i]->last_request_buf = imp_http_request_serialize_with_url(request->request, request->body, request->url);
+
+                imp_http_client_write(&pool->idle_workers.workers[i]->client, pool->idle_workers.workers[i]->last_request_buf, imp__http_pool_write_cb);
 
                 free(request);
 
@@ -278,7 +292,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
                 (pool->idle_workers.workers[i]->is_connected == 0)) 
             {
                 // is not connected
-                pool->idle_workers.workers[i]->last_request = (uv_buf_t *)request->request;
+                pool->idle_workers.workers[i]->last_request = request->request;
                 pool->idle_workers.workers[i]->on_complete = request->on_complete;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
 
@@ -286,6 +300,8 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
                     imp_url_free(pool->idle_workers.workers[i]->client.url);
 
                 pool->idle_workers.workers[i]->client.url = request->url;
+                pool->idle_workers.workers[i]->last_request_body = request->body;
+
                 imp_http_client_connect(&pool->idle_workers.workers[i]->client, imp__http_pool_status_cb, imp__http_pool_ready_cb);
 
                 free(request);
@@ -297,7 +313,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
         for (size_t i = 0; i < pool->idle_workers.len; i++) {
             if (pool->idle_workers.workers[i] != NULL) 
             {
-                pool->idle_workers.workers[i]->last_request = (uv_buf_t *)request->request;
+                pool->idle_workers.workers[i]->last_request = request->request;
                 pool->idle_workers.workers[i]->on_complete = request->on_complete;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
 
@@ -305,6 +321,8 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
                     imp_url_free(pool->idle_workers.workers[i]->client.url);
 
                 pool->idle_workers.workers[i]->client.url = request->url;
+                pool->idle_workers.workers[i]->last_request_body = request->body;
+
                 imp_http_client_shutdown (&pool->idle_workers.workers[i]->client, imp__pool_on_close_new_host);
 
                 free(request);

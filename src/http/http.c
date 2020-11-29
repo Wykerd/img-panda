@@ -738,7 +738,7 @@ void imp_http_headers_free (imp_http_headers_t *headers) {
     free(headers->base);
 }
 
-imp_http_request_t *imp_http_request_init (imp_http_client_t *client, const char* method) {
+imp_http_request_t *imp_http_request_init (const char* method) {
     imp_http_request_t *req = malloc(sizeof(imp_http_request_t));
 
     imp_http_headers_init(&req->headers);
@@ -748,12 +748,12 @@ imp_http_request_t *imp_http_request_init (imp_http_client_t *client, const char
     memcpy(req->method, method, method_len);
     req->method[method_len] = 0;
 
-    req->client = client;
-
     return req;
 };
 
-uv_buf_t *imp_http_request_header_with_path (imp_http_request_t *req, imp_url_path_t *path, int include_content_type) {
+uv_buf_t *imp_http_request_header_with_path (imp_http_request_t *req, imp_url_path_t *path, 
+                                             int include_content_type, const char* host_name) 
+{
     int has_host = 0, has_auth = 0, has_content_type = !include_content_type;
 
     uv_buf_t *header = malloc(sizeof(uv_buf_t));
@@ -826,21 +826,8 @@ uv_buf_t *imp_http_request_header_with_path (imp_http_request_t *req, imp_url_pa
 
     size_t orig_header_len = req->headers.len;
 
-    if (!has_host) {
-        uv_buf_t field = {
-            .base = "Host",
-            .len = 4
-        };
-
-        uv_buf_t value = {
-            .base = req->client->url->host,
-            .len = strlen(req->client->url->host)
-        };
-
-        imp_http_headers_push_buf(&req->headers, &field, &value);
-
-        header_len += field.len + 2 + value.len + 2;
-    };
+    if (!has_host) 
+        header_len += 4 + 2 + strlen(host_name) + 2;
 
     if (!has_auth) {
         size_t userinfo_len = strlen(path->userinfo);
@@ -899,17 +886,27 @@ skip_auth:
         }
     };
 
+    if (!has_host) {
+        memcpy(header->base + cursor, "Host", 4);
+        cursor += 4;
+        header->base[cursor++] = ':';
+        header->base[cursor++] = ' ';
+        size_t host_len = strlen(host_name);
+        memcpy(header->base + cursor, host_name, host_len);
+        cursor += host_len;
+        header->base[cursor++] = '\r';
+        header->base[cursor++] = '\n';
+    };
+
     header->base[cursor++] = '\r';
     header->base[cursor++] = '\n';
 
     return header;
 };
 
-uv_buf_t *imp_http_request_header (imp_http_request_t *req, int include_content_type) {
-    return imp_http_request_header_with_path(req, (imp_url_path_t *)req->client->url, include_content_type);
-};
-
-uv_buf_t *imp_http_request_serialize_with_path (imp_http_request_t *req, uv_buf_t *body, imp_url_path_t *path) {
+uv_buf_t *imp_http_request_serialize_with_path (imp_http_request_t *req, uv_buf_t *body, 
+                                                imp_url_path_t *path, const char* host_name) 
+{
     if ((body != NULL) && body->len) {
         uv_buf_t value;
         value.len = snprintf(NULL, 0, "%zu", body->len);
@@ -921,7 +918,7 @@ uv_buf_t *imp_http_request_serialize_with_path (imp_http_request_t *req, uv_buf_
         free(value.base);
     }
 
-    uv_buf_t *serial = imp_http_request_header_with_path(req, path, body != NULL);
+    uv_buf_t *serial = imp_http_request_header_with_path(req, path, body != NULL, host_name);
 
     if ((body != NULL) && body->len) {
         size_t cursor = serial->len;
@@ -933,8 +930,8 @@ uv_buf_t *imp_http_request_serialize_with_path (imp_http_request_t *req, uv_buf_
     return serial;
 };
 
-uv_buf_t *imp_http_request_serialize (imp_http_request_t *req, uv_buf_t *body) {
-    return imp_http_request_serialize_with_path(req, body, (imp_url_path_t *)req->client->url);
+uv_buf_t *imp_http_request_serialize_with_url (imp_http_request_t *req, uv_buf_t *body, imp_url_t *url) {
+    return imp_http_request_serialize_with_path(req, body, (imp_url_path_t *)url, url->host);
 };
 
 void imp_http_request_serialize_free (uv_buf_t *buf) {

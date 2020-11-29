@@ -28,7 +28,6 @@ typedef struct imp_http_client_s imp_http_client_t;
 typedef struct imp_http_request_s {
     imp_http_headers_t headers;
     char* method;
-    imp_http_client_t *client;
 } imp_http_request_t;
 
 typedef void (*imp_http_client_status_cb)(imp_http_client_t *client, imp_net_status_t *status);
@@ -94,11 +93,12 @@ imp_http_request_err_t imp_http_headers_push_buf (imp_http_headers_t *headers, u
 imp_http_request_err_t imp_http_headers_push (imp_http_headers_t *headers, char* field, char* value);
 void imp_http_headers_free (imp_http_headers_t *headers);
 
-imp_http_request_t *imp_http_request_init (imp_http_client_t *client, const char* method);
-uv_buf_t *imp_http_request_header_with_path (imp_http_request_t *req, imp_url_path_t *path, int include_content_type);
-uv_buf_t *imp_http_request_header (imp_http_request_t *req, int include_content_type);
-uv_buf_t *imp_http_request_serialize_with_path (imp_http_request_t *req, uv_buf_t *body, imp_url_path_t *path);
-uv_buf_t *imp_http_request_serialize (imp_http_request_t *req, uv_buf_t *body);
+imp_http_request_t *imp_http_request_init (const char* method);
+uv_buf_t *imp_http_request_header_with_path (imp_http_request_t *req, imp_url_path_t *path, 
+                                             int include_content_type, const char* host_name);
+uv_buf_t *imp_http_request_serialize_with_path (imp_http_request_t *req, uv_buf_t *body, 
+                                                imp_url_path_t *path, const char* host_name);
+uv_buf_t *imp_http_request_serialize_with_url (imp_http_request_t *req, uv_buf_t *body, imp_url_t *url);
 void imp_http_request_serialize_free (uv_buf_t *buf);
 void imp_http_request_free (imp_http_request_t *req);
 

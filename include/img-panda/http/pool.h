@@ -30,7 +30,9 @@ struct imp_http_worker_s {
     imp_url_t *redirect_url;
 
     // HTTP
-    uv_buf_t *last_request;
+    imp_http_request_t *last_request;
+    uv_buf_t *last_request_buf;
+    uv_buf_t *last_request_body;
     imp_reusable_buf_t last_response;
 
     // Status
@@ -49,10 +51,11 @@ typedef struct imp_http_worker_list_s {
 
 // requests are freed automatically
 typedef struct imp_http_worker_request_s {
-    imp_buf_t *request; // buffer content and buffer itself is freed internally!
+    imp_http_request_t *request; // buffer content and buffer itself is freed internally!
     imp_url_t *url; // url is to be duped as it is freed internally!
     imp_http_pool_cb on_complete;
     imp_http_pool_status_cb on_response;
+    uv_buf_t *body; // not freed internally - free on callback last_request_body
     void* data; // opaque
 } imp_http_worker_request_t;
 
