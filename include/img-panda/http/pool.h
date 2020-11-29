@@ -66,10 +66,11 @@ typedef struct imp_http_pool_s {
     imp_http_worker_request_t **queue;
     size_t queue_len;
     size_t queue_size;
+    void *data; // opaque
 } imp_http_pool_t;
 
 int imp_http_worker_init (imp_http_pool_t *pool, imp_http_worker_t *worker);
-int imp_http_pool_init (uv_loop_t *loop, imp_http_pool_t *pool, size_t worker_count, imp_url_t *url);
+int imp_http_pool_init (uv_loop_t *loop, imp_http_pool_t *pool, size_t worker_count);
 
 int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *request);
 

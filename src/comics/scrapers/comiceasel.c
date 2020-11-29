@@ -227,7 +227,7 @@ err_prev:
     // TODO NULL + errs
     hashmap_set(state->content, strip);
 
-    imp_wc_download_image (state, strip);
+    // imp_wc_download_image (state, strip);
 
 cleanup:
     lxb_dom_collection_destroy(collection, true);
@@ -264,7 +264,7 @@ imp_wc_err_t imp_wc_comic_easel_crawl (imp_wc_indexer_state_t *state, lxb_html_d
 
         if (href_attr == NULL) continue;
 
-        DUMP_ATTRIBUTE(href_attr, "CHAPTER");
+        // DUMP_ATTRIBUTE(href_attr, "CHAPTER");
     };
 
     lxb_dom_collection_clean(collection);

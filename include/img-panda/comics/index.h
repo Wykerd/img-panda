@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 #include "img-panda/common.h"
-#include "img-panda/http/http.h"
+#include "img-panda/http/pool.h"
 #include "img-panda/comics/identify/metadata.h"
 #include "err.h"
 #include <uv.h>
@@ -19,23 +19,12 @@ typedef void (*imp_wc_indexer_status_cb)(imp_wc_indexer_state_t *state);
 
 struct imp_wc_indexer_state_s {
     uv_loop_t *loop;
-    imp_http_client_t client;
+    imp_http_pool_t pool;
     
+    imp_url_t *url;
+
     // Events
     imp_wc_indexer_cb on_complete;
-    imp_wc_indexer_status_cb on_response;
-    
-    // Redirect
-    int should_redirect;
-    int is_location_header;
-    int redirect_new_host;
-    imp_url_t *redirect_url;
-
-    // HTTP
-    uv_buf_t *last_request;
-    imp_reusable_buf_t last_response;
-
-    // Work pool
 
     // State
     imp_wc_meta_index_t metadata;

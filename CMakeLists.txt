@@ -23,6 +23,7 @@ add_executable(ripper
     src/http/http.c
     src/http/net.c 
     src/http/tcp.c 
+    src/http/pool.c
     
     # Parsers
     src/parsers/url_parser.c 
