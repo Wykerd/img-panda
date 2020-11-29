@@ -12,7 +12,7 @@ extern "C" {
 typedef struct imp_http_worker_s imp_http_worker_t;
 typedef struct imp_http_pool_s imp_http_pool_t;
 
-typedef void (*imp_http_pool_cb)(imp_http_worker_t *worker, imp_http_pool_t *pool, int status, int errcode);
+typedef void (*imp_http_pool_err_cb)(imp_http_worker_t *worker, imp_net_status_t *status);
 
 typedef void (*imp_http_pool_status_cb)(imp_http_worker_t *worker, imp_http_pool_t *pool);
 
@@ -20,7 +20,7 @@ struct imp_http_worker_s {
     imp_http_client_t client;
 
     // Events
-    imp_http_pool_cb on_complete;
+    imp_http_pool_err_cb on_error;
     imp_http_pool_status_cb on_response;
 
     // Redirect
@@ -38,7 +38,7 @@ struct imp_http_worker_s {
     // Status
     int working;
     int is_connected;
-    time_t created_at;
+    int is_idle;
 
     // Parent
     imp_http_pool_t *pool;
@@ -53,7 +53,7 @@ typedef struct imp_http_worker_list_s {
 typedef struct imp_http_worker_request_s {
     imp_http_request_t *request; // buffer content and buffer itself is freed internally!
     imp_url_t *url; // url is to be duped as it is freed internally!
-    imp_http_pool_cb on_complete;
+    imp_http_pool_err_cb on_error;
     imp_http_pool_status_cb on_response;
     uv_buf_t *body; // not freed internally - free on callback last_request_body
     void* data; // opaque

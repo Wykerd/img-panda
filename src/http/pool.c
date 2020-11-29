@@ -2,12 +2,24 @@
 #include "img-panda/http/pool.h"
 #include <string.h>
 
+static void imp__wc_on_close_idle (uv_handle_t* handle);
+
+inline
+static void imp__http_pool_kill_worker (imp_http_worker_t *state, imp_net_status_t *err) {
+    state->is_connected = 0;
+    imp_http_client_shutdown(&state->client, imp__wc_on_close_idle);
+
+    // is not idle some error caused an issue
+    if (!state->is_idle && (state->on_error != NULL))
+        state->on_error(state, err);
+}
+
 static void imp__http_pool_write_cb (imp_http_client_t *client, imp_net_status_t *err) {
     printf("*** WORKER %p SENT REQUEST\n", client->data);
-    if (err->type != FA_NET_E_OK) {
-        // TODO ERROR
-    };
     imp_http_worker_t *state = client->data;
+    if (err->type != FA_NET_E_OK) {
+        imp__http_pool_kill_worker(state, err);
+    };
     imp_http_request_serialize_free(state->last_request_buf);
 };
 
@@ -15,7 +27,13 @@ static int imp__wc_on_status_recv (llhttp_t* parser, const char *at, size_t leng
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)(parser->data))->data;
     state->should_redirect = ((parser->status_code > 299) && (parser->status_code < 400));
     if (!state->should_redirect) {
-        // TODO: EXIT AND SHUTDOWN if not 200
+        if (!((parser->status_code > 199) && (parser->status_code < 300))) {
+            imp_net_status_t err = {
+                .type = FA_NET_NOT_2XX,
+                .code = parser->status_code 
+            };
+            imp__http_pool_kill_worker(state, &err);
+        };
     };
 
     return 0;
@@ -30,12 +48,10 @@ static void imp__http_pool_ready_cb (imp_http_client_t *client) {
 }
 
 static void imp__http_pool_status_cb (imp_http_client_t *client, imp_net_status_t *err) {
+    imp_http_worker_t *state = client->data;
     if (err->type != FA_NET_E_OK) {
-        char buf[256] = {0};
-        ERR_error_string(ERR_get_error(), buf);
-        printf("!!! Status %d %ld %s\n\n", err->type, err->code, buf);
-        // TODO
-    };
+        imp__http_pool_kill_worker(state, err);
+    }
 };
 
 int imp__wc_on_body_recv (llhttp_t* parser, const char *at, size_t length) {
@@ -108,6 +124,7 @@ static imp_http_worker_t *imp__http_pool_set_idle (imp_http_pool_t *pool, imp_ht
         if (pool->idle_workers.workers[x] == NULL) {
             printf("*** WORKER %p MOVED TO IDLE POOL\n", *work);
             pool->idle_workers.workers[x] = *work;
+            pool->idle_workers.workers[x]->is_idle = 1;
             *work = NULL;
             pool->working_workers.len--;
             pool->idle_workers.len++;
@@ -117,6 +134,11 @@ static imp_http_worker_t *imp__http_pool_set_idle (imp_http_pool_t *pool, imp_ht
     return NULL;
 }
 
+static void imp__wc_on_close_idle (uv_handle_t* handle) {
+    imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
+    if (!state->is_idle)
+        imp__http_pool_set_idle(state->pool, &state);
+}
 
 int imp__pool_on_message_complete (llhttp_t* parser) {
     imp_http_worker_t * state = (imp_http_worker_t *)((imp_http_client_t *)(parser->data))->data;
@@ -126,7 +148,7 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
         if (state->redirect_new_host) 
             imp_http_client_shutdown (&state->client, imp__wc_on_close_redirect);
         else {
-            printf("<<< Redirecting to: %s\n<<< Using existing connection!\n\n", state->redirect_url->host);
+            printf("<<< Redirecting to: %s\n<<< Using existing connection!\n", state->redirect_url->host);
             imp_url_free(state->client.url);
             state->client.url = state->redirect_url;
             imp__http_pool_ready_cb(parser->data);
@@ -147,7 +169,7 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
         imp_http_worker_request_t *req = state->pool->queue[state->pool->queue_len - 1];
 
         state->last_request = req->request;
-        state->on_complete = req->on_complete;
+        state->on_error = req->on_error;
         state->on_response = req->on_response;
         state->last_request_body = req->body;
 
@@ -193,6 +215,8 @@ int imp_http_worker_init (imp_http_pool_t *pool, imp_http_worker_t *worker) {
 
     worker->client.settings.keep_alive = 1;
     worker->client.data = worker;
+
+    worker->is_idle = 1;
 
     worker->pool = pool;
 
@@ -251,6 +275,7 @@ static int imp__http_pool_set_working (imp_http_pool_t *pool, imp_http_worker_t 
         if (pool->working_workers.workers[x] == NULL) {
             printf("*** WORKER %p MOVED TO WORK POOL\n", *idle);
             pool->working_workers.workers[x] = *idle;
+            pool->working_workers.workers[x]->is_idle = 0;
             *idle = NULL;
             pool->idle_workers.len--;
             pool->working_workers.len++;
@@ -269,7 +294,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
             {
                 // request can be submitted immediately
                 pool->idle_workers.workers[i]->last_request = request->request;
-                pool->idle_workers.workers[i]->on_complete = request->on_complete;
+                pool->idle_workers.workers[i]->on_error = request->on_error;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
                 if (pool->idle_workers.workers[i]->client.url != NULL)
                     imp_url_free(pool->idle_workers.workers[i]->client.url);
@@ -293,7 +318,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
             {
                 // is not connected
                 pool->idle_workers.workers[i]->last_request = request->request;
-                pool->idle_workers.workers[i]->on_complete = request->on_complete;
+                pool->idle_workers.workers[i]->on_error = request->on_error;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
 
                 if (pool->idle_workers.workers[i]->client.url != NULL)
@@ -314,7 +339,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
             if (pool->idle_workers.workers[i] != NULL) 
             {
                 pool->idle_workers.workers[i]->last_request = request->request;
-                pool->idle_workers.workers[i]->on_complete = request->on_complete;
+                pool->idle_workers.workers[i]->on_error = request->on_error;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
 
                 if (pool->idle_workers.workers[i]->client.url != NULL)
