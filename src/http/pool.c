@@ -169,6 +169,7 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
         imp_http_worker_request_t *req = state->pool->queue[state->pool->queue_len - 1];
 
         state->last_request = req->request;
+        state->last_request_data = req->data;
         state->on_error = req->on_error;
         state->on_response = req->on_response;
         state->last_request_body = req->body;
@@ -294,6 +295,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
             {
                 // request can be submitted immediately
                 pool->idle_workers.workers[i]->last_request = request->request;
+                pool->idle_workers.workers[i]->last_request_data = request->data;
                 pool->idle_workers.workers[i]->on_error = request->on_error;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
                 if (pool->idle_workers.workers[i]->client.url != NULL)
@@ -318,6 +320,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
             {
                 // is not connected
                 pool->idle_workers.workers[i]->last_request = request->request;
+                pool->idle_workers.workers[i]->last_request_data = request->data;
                 pool->idle_workers.workers[i]->on_error = request->on_error;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
 
@@ -339,6 +342,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
             if (pool->idle_workers.workers[i] != NULL) 
             {
                 pool->idle_workers.workers[i]->last_request = request->request;
+                pool->idle_workers.workers[i]->last_request_data = request->data;
                 pool->idle_workers.workers[i]->on_error = request->on_error;
                 pool->idle_workers.workers[i]->on_response = request->on_response;
 
