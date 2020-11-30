@@ -263,9 +263,20 @@ read_loop:
                     char c;
                     ssize_t x = recv(SSL_get_fd(client->ssl), &c, 1, MSG_PEEK);
                     if (x == 0) {
+                        free_handle = 1;
+                        has_notified_of_closed = 1;
+
+                        imp_net_status_t stat = {
+                            .type = FA_NET_E_TLS_SESSION_CLOSED,
+                            .code = err
+                        };
+
+                        (*(imp_http_client_status_cb)client->status_cb)(client, &stat);
+
                         puts("FIN\n\n");
+
+                        goto write_exit;
                     }
-                    goto write_exit;
                 }
 
                 imp_net_status_t stat = {
