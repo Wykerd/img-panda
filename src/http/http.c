@@ -231,12 +231,14 @@ static void imp__http_client_tls_poll_cb (uv_poll_t* handle, int status, int eve
     };
 
     int err, free_handle = 0, has_notified_of_closed = 0;
-
+    size_t nread;
+    int success;
     if (events & UV_READABLE) {
-        size_t nread = 0;
-        int success = SSL_read_ex(client->ssl, client->tls_read_buf, FA_HTTPS_BUF_LEN * sizeof(char), &nread);
+read_loop:
+        nread = 0;
+        success = SSL_read_ex(client->ssl, client->tls_read_buf, FA_HTTPS_BUF_LEN * sizeof(char), &nread);
         
-        err = SSL_get_error(client->ssl, err);
+        err = SSL_get_error(client->ssl, success);
 
         if (!success) {
             if (err == SSL_ERROR_WANT_READ ||
@@ -280,6 +282,10 @@ static void imp__http_client_tls_poll_cb (uv_poll_t* handle, int status, int eve
             };
 
             client->read_cb(client, &read_buf);
+
+            if (SSL_pending(client->ssl) > 0) {
+                goto read_loop;
+            } 
         };
     };
 
