@@ -138,10 +138,9 @@ static int imp__strip_cmp(const void *a, const void *b, void *udata) {
 
 static uint64_t imp__strip_hash(const void *item, uint64_t seed0, uint64_t seed1) {
     const imp_wc_meta_strip_t *strip = item;
-    const char *format = "%s%s%s%s%s%s%s";
+    const char *format = "%s%s%s%s%s%s";
     int len;
     len = snprintf(NULL, 0, format, 
-        strip->src_url->fragment, 
         strip->src_url->host, 
         strip->src_url->port, 
         strip->src_url->query, 
@@ -150,7 +149,6 @@ static uint64_t imp__strip_hash(const void *item, uint64_t seed0, uint64_t seed1
         strip->src_url->path);
     char *key = malloc(len + 1);
     snprintf(key, len + 1, format, 
-        strip->src_url->fragment, 
         strip->src_url->host,
         strip->src_url->port, 
         strip->src_url->query, 
