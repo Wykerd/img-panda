@@ -119,25 +119,31 @@ static void imp__pool_on_close_new_host (uv_handle_t* handle) {
 };
 
 inline 
-static imp_http_worker_t *imp__http_pool_set_idle (imp_http_pool_t *pool, imp_http_worker_t **work) {
-    for (size_t x = 0; x < pool->pool_size; x++) {
-        if (pool->idle_workers.workers[x] == NULL) {
-            printf("*** WORKER %p MOVED TO IDLE POOL\n", *work);
-            pool->idle_workers.workers[x] = *work;
-            pool->idle_workers.workers[x]->is_idle = 1;
-            *work = NULL;
-            pool->working_workers.len--;
-            pool->idle_workers.len++;
-            return pool->idle_workers.workers[x];
-        };
-    };
-    return NULL;
+static int imp__http_pool_set_working (imp_http_pool_t *pool, imp_http_worker_t *idle) {
+    printf("*** WORKER %p MOVED TO WORK POOL\n", idle);
+    pool->working_workers.workers[idle->pos] = idle;
+    pool->working_workers.workers[idle->pos]->is_idle = 0;
+    pool->idle_workers.workers[idle->pos] = NULL;
+    pool->idle_workers.len--;
+    pool->working_workers.len++;
+    return 1;
+}
+
+inline 
+static imp_http_worker_t *imp__http_pool_set_idle (imp_http_pool_t *pool, imp_http_worker_t *work) {
+    printf("*** WORKER %p MOVED TO IDLE POOL\n", work);
+    pool->idle_workers.workers[work->pos] = work;
+    pool->idle_workers.workers[work->pos]->is_idle = 1;
+    pool->working_workers.workers[work->pos] = NULL;
+    pool->working_workers.len--;
+    pool->idle_workers.len++;
+    return pool->idle_workers.workers[work->pos];
 }
 
 static void imp__wc_on_close_idle (uv_handle_t* handle) {
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
     if (!state->is_idle)
-        imp__http_pool_set_idle(state->pool, &state);
+        imp__http_pool_set_idle(state->pool, state);
 }
 
 int imp__pool_on_message_complete (llhttp_t* parser) {
@@ -165,9 +171,10 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
 
     // Check if we can consume one of the queue items
     if (state->pool->queue_len > 0) {
-        puts("*** CONSUMING QUEUED REQUEST");
+        printf("*** WORKER %p CONSUMING QUEUED REQUEST\n", state);
         imp_http_worker_request_t *req = state->pool->queue[state->pool->queue_len - 1];
 
+        imp_http_request_free(state->last_request);
         state->last_request = req->request;
         state->last_request_data = req->data;
         state->on_error = req->on_error;
@@ -178,22 +185,22 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
             // has same host
             imp_url_free(state->client.url);
             state->client.url = req->url;
-            imp_http_client_connect(&state->client, imp__http_pool_status_cb, imp__http_pool_ready_cb);
+            imp__http_pool_ready_cb(&state->client);
         } else {
             // not same host close and reconnect
             imp_url_free(state->client.url);
             state->client.url = req->url;
-            imp_http_client_shutdown (&state->client, imp__pool_on_close_new_host);
+            imp_http_client_shutdown(&state->client, imp__pool_on_close_new_host);
         }
 
         free(req);
 
         state->pool->queue[state->pool->queue_len - 1] = NULL;
-    } else {
-        // move to the idle pool
-        state = imp__http_pool_set_idle(state->pool, &state);
-    };
+        state->pool->queue_len--;
+        goto cleanup;
+    } 
 
+    state = imp__http_pool_set_idle(state->pool, state);
     // free the request - we have handled it now
     imp_http_request_free(state->last_request);
     
@@ -265,30 +272,16 @@ int imp_http_pool_init (uv_loop_t *loop, imp_http_pool_t *pool, size_t worker_co
         if (pool->idle_workers.workers[i] == NULL)
             return 0;
         imp_http_worker_init(pool, pool->idle_workers.workers[i]);
+        pool->idle_workers.workers[i]->pos = i;
     };
 
     return 1;
 };
 
-inline 
-static int imp__http_pool_set_working (imp_http_pool_t *pool, imp_http_worker_t **idle) {
-    for (size_t x = 0; x < pool->pool_size; x++) {
-        if (pool->working_workers.workers[x] == NULL) {
-            printf("*** WORKER %p MOVED TO WORK POOL\n", *idle);
-            pool->working_workers.workers[x] = *idle;
-            pool->working_workers.workers[x]->is_idle = 0;
-            *idle = NULL;
-            pool->idle_workers.len--;
-            pool->working_workers.len++;
-            return 1;
-        };
-    };
-    return 0;
-}
-
 int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *request) {
-    if (pool->idle_workers.len > 0) {
-        for (size_t i = 0; i < pool->idle_workers.len; i++) {
+    if (pool->idle_workers.len) {
+        printf("--- CAP %d\n", pool->idle_workers.len);
+        for (size_t i = 0; i < pool->pool_size; i++) {
             if ((pool->idle_workers.workers[i] != NULL) &&
                 pool->idle_workers.workers[i]->is_connected && 
                 !strcmp(request->url->host, pool->idle_workers.workers[i]->client.url->host)) 
@@ -310,11 +303,12 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
 
                 free(request);
 
-                return imp__http_pool_set_working(pool, &pool->idle_workers.workers[i]);
+                return imp__http_pool_set_working(pool, pool->idle_workers.workers[i]);
             };
         };
+        puts("WORK FAIL 1");
 
-        for (size_t i = 0; i < pool->idle_workers.len; i++) {
+        for (size_t i = 0; i < pool->pool_size; i++) {
             if ((pool->idle_workers.workers[i] != NULL) && 
                 (pool->idle_workers.workers[i]->is_connected == 0)) 
             {
@@ -334,11 +328,12 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
 
                 free(request);
                 
-                return imp__http_pool_set_working(pool, &pool->idle_workers.workers[i]);
+                return imp__http_pool_set_working(pool, pool->idle_workers.workers[i]);
             };
         };
+        puts("WORK FAIL 2");
 
-        for (size_t i = 0; i < pool->idle_workers.len; i++) {
+        for (size_t i = 0; i < pool->pool_size; i++) {
             if (pool->idle_workers.workers[i] != NULL) 
             {
                 pool->idle_workers.workers[i]->last_request = request->request;
@@ -356,10 +351,11 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
 
                 free(request);
 
-                return imp__http_pool_set_working(pool, &pool->idle_workers.workers[i]);
+                return imp__http_pool_set_working(pool, pool->idle_workers.workers[i]);
             }
-        }
-        return 0;
+        };
+        puts("WORK FAIL 3");
+        exit(1);
     } else {
         if (pool->queue_len >= pool->queue_size)
             imp__http_pool_queue_grow(pool);
