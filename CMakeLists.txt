@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-project(img-panda LANGUAGES C CXX)
+project(img-panda LANGUAGES C CXX VERSION 0.1.0)
 
 file(DOWNLOAD https://raw.githubusercontent.com/simdjson/simdjson/master/singleheader/simdjson.h ${CMAKE_CURRENT_SOURCE_DIR}/deps/simdjson/simdjson.h)
 
