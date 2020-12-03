@@ -2,8 +2,64 @@
 #include "lexbor/html/serialize.h"
 // TODO null checks
 
-imp_wc_err_t imp_wc_comic_easel_chapter_page (imp_wc_indexer_state_t *state, lxb_html_document_t *document, imp_url_t* url) {
+imp_wc_err_t imp_wc_comic_easel_chapter_page (imp_wc_indexer_state_t *state, lxb_html_document_t *document, 
+                                              imp_url_t* url, imp_wc_meta_chapter_t *chapter) 
+{
+    puts("------- PROCESSING PAGE");
+}
+
+static void imp__chapter_page_dl_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
+    imp_wc_indexer_state_t *state = worker->last_request->data;
+    imp_wc_meta_chapter_t *chap = worker->last_request_data;
+    lxb_status_t status;
+    lxb_html_document_t *document;
+
+    document = lxb_html_document_create();
+    if (document == NULL)
+        goto fail;
+
+    status = lxb_html_document_parse(document, worker->last_response.base, worker->last_response.len);
+    if (status != LXB_STATUS_OK)
+        goto fail;
+
+    imp_wc_comic_easel_chapter_page (state, document, worker->client.url, chap);
+
+fail:
+    // TODO FAIL
+    lxb_html_document_destroy(document);
+}
+
+inline
+static void imp__push_chapter_page (imp_wc_indexer_state_t *state, imp_wc_meta_chapter_t *chapter, const size_t page) {
+    imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
+    memset(req, 0, sizeof(imp_http_worker_request_t));
+
+    req->url = imp_url_clone(chapter->url);
+
+    size_t path_len = strlen(req->url->path);
+
+    req->url->path = realloc(req->url->path, path_len + 15);
+
+    if (req->url->path[path_len - 1] != '/')
+        req->url->path[path_len++] = '/';
+
+    snprintf(req->url->path + path_len, path_len + 14, "page/%d", page);
+
+    printf("--- DOWNLOADING PAGE %s\n", req->url->path);
+
+    imp_http_request_t *http_req = imp_http_request_init("GET");
     
+    imp_http_pool_default_headers(&http_req->headers);
+
+    http_req->data = state;
+
+    req->request = http_req;
+
+    req->data = chapter;
+
+    req->on_response = imp__chapter_page_dl_cb;
+
+    imp_http_pool_request(&state->pool, req);
 }
 
 imp_wc_err_t imp_wc_comic_easel_chapter (imp_wc_indexer_state_t *state, lxb_html_document_t *document, 
@@ -61,6 +117,10 @@ imp_wc_err_t imp_wc_comic_easel_chapter (imp_wc_indexer_state_t *state, lxb_html
             max_page = cur_page;
     };
 
+    for (size_t i = 2; i < max_page + 1; i++) 
+        imp__push_chapter_page(state, chapter, i);
+
+    imp_wc_comic_easel_chapter_page(state, document, url, chapter);
 
 cleanup:
     free (chapter_pre);
