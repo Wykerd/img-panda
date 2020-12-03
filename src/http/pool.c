@@ -280,7 +280,6 @@ int imp_http_pool_init (uv_loop_t *loop, imp_http_pool_t *pool, size_t worker_co
 
 int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *request) {
     if (pool->idle_workers.len) {
-        printf("--- CAP %d\n", pool->idle_workers.len);
         for (size_t i = 0; i < pool->pool_size; i++) {
             if ((pool->idle_workers.workers[i] != NULL) &&
                 pool->idle_workers.workers[i]->is_connected && 
@@ -306,7 +305,6 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
                 return imp__http_pool_set_working(pool, pool->idle_workers.workers[i]);
             };
         };
-        puts("WORK FAIL 1");
 
         for (size_t i = 0; i < pool->pool_size; i++) {
             if ((pool->idle_workers.workers[i] != NULL) && 
@@ -331,7 +329,6 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
                 return imp__http_pool_set_working(pool, pool->idle_workers.workers[i]);
             };
         };
-        puts("WORK FAIL 2");
 
         for (size_t i = 0; i < pool->pool_size; i++) {
             if (pool->idle_workers.workers[i] != NULL) 
@@ -354,8 +351,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
                 return imp__http_pool_set_working(pool, pool->idle_workers.workers[i]);
             }
         };
-        puts("WORK FAIL 3");
-        exit(1);
+        return 0;
     } else {
         if (pool->queue_len >= pool->queue_size)
             imp__http_pool_queue_grow(pool);
