@@ -65,7 +65,6 @@ typedef struct imp_wc_meta_strip_s {
 
     imp_wc_meta_chapter_t *chapter;
     int is_scraped;
-    int is_downloaded;
 } imp_wc_meta_strip_t;
 
 inline 

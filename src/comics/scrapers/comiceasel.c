@@ -2,10 +2,110 @@
 #include "lexbor/html/serialize.h"
 // TODO null checks
 
+static void imp__strip_page_dl_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
+    imp_wc_indexer_state_t *state = worker->last_request->data;
+    imp_wc_meta_strip_t *strip = worker->last_request_data;
+    if (strip == NULL) {
+        puts("STRIP IS NULL");
+    }
+    lxb_status_t status;
+    lxb_html_document_t *document;
+
+    document = lxb_html_document_create();
+    if (document == NULL)
+        goto fail;
+
+    status = lxb_html_document_parse(document, worker->last_response.base, worker->last_response.len);
+    if (status != LXB_STATUS_OK)
+        goto fail;
+
+    imp_wc_comic_easel_scrape(state, document, strip->src_url);
+
+fail:
+    // TODO FAIL
+    lxb_html_document_destroy(document);
+}
+
+inline
+static void imp__push_strip_page (imp_wc_indexer_state_t *state, imp_wc_meta_strip_t *strip) {
+    imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
+    memset(req, 0, sizeof(imp_http_worker_request_t));
+
+    req->url = imp_url_dup(strip->src_url);
+
+    imp_http_request_t *http_req = imp_http_request_init("GET");
+    
+    imp_http_pool_default_headers(&http_req->headers);
+
+    http_req->data = state;
+
+    req->request = http_req;
+
+    req->data = strip;
+
+    req->on_response = imp__strip_page_dl_cb;
+
+    imp_http_pool_request(&state->pool, req);
+}
+
 imp_wc_err_t imp_wc_comic_easel_chapter_page (imp_wc_indexer_state_t *state, lxb_html_document_t *document, 
                                               imp_url_t* url, imp_wc_meta_chapter_t *chapter) 
 {
-    puts("------- PROCESSING PAGE");
+    lxb_status_t status;
+    imp_wc_err_t err = E_WC_OK;
+
+    lxb_dom_collection_t *collection;
+
+    CHK_N_EQ(collection, lxb_dom_collection_make(&document->dom_document, 30), NULL, E_WC_CREATE_COLLECTION);
+
+    status = lxb_dom_elements_by_attr_contain (
+        lxb_dom_interface_element(document->body), collection,
+        "href", 4,
+        "/comic/", 7,
+        true
+    );
+
+    if (status != LXB_STATUS_OK) {
+        err = E_WC_FIND_STRIP_HREF;
+        goto cleanup;
+    };
+
+    lxb_dom_element_t *anchor;
+    lxb_dom_attr_t *href_attr;
+
+    for (size_t i = 0; i < lxb_dom_collection_length(collection); i++) {
+        anchor = lxb_dom_collection_element(collection, i);
+
+        href_attr = lxb_dom_element_attr_by_name(anchor, "href", 4);
+        if (href_attr == NULL) continue;        
+        
+        imp_url_t *url = imp_parse_url(href_attr->value->data, href_attr->value->length);
+        if (url == NULL) continue;
+
+        imp_wc_meta_strip_t *strip = hashmap_get(state->content, &(imp_wc_meta_strip_t){ .src_url = url });
+        if (strip == NULL) {
+            strip = malloc(sizeof(imp_wc_meta_strip_t));
+            imp_wc_meta_strip_init(strip);
+        };
+
+        if (strip->chapter != NULL)
+            continue; // its already tracked
+
+        if (strip->src_url == NULL)
+            strip->src_url = url;
+        else
+            imp_url_free(url);
+        
+        strip->chapter = chapter;
+
+        hashmap_set(state->content, strip);
+
+        imp__push_strip_page(state, strip);
+    };
+
+cleanup:
+    lxb_dom_collection_destroy(collection, true);
+    return err;
 }
 
 static void imp__chapter_page_dl_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
@@ -291,9 +391,10 @@ err_prev:
     };
 
     // TODO NULL + errs
+    strip->is_scraped = 1;
     hashmap_set(state->content, strip);
 
-    imp_wc_download_image (state, strip);
+    imp_wc_download_image(state, strip);
 
 cleanup:
     lxb_dom_collection_destroy(collection, true);

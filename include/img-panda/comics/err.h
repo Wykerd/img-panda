@@ -29,6 +29,7 @@ typedef enum imp_wc_err {
     E_WC_FIND_LOGO,
     E_WC_FIND_STRIP,
     E_WC_FIND_CHAPTER_PAGES,
+    E_WC_FIND_STRIP_HREF
 } imp_wc_err_t;
 
 #ifdef __cplusplus
