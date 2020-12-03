@@ -6,7 +6,9 @@ imp_wc_err_t imp_wc_comic_easel_chapter_page (imp_wc_indexer_state_t *state, lxb
     
 }
 
-imp_wc_err_t imp_wc_comic_easel_chapter (imp_wc_indexer_state_t *state, lxb_html_document_t *document, imp_url_t* url) {
+imp_wc_err_t imp_wc_comic_easel_chapter (imp_wc_indexer_state_t *state, lxb_html_document_t *document, 
+                                         imp_url_t* url, imp_wc_meta_chapter_t *chapter)
+{
     lxb_status_t status;
     imp_wc_err_t err = E_WC_OK;
 
@@ -252,7 +254,7 @@ static void imp__chapter_dl_cb (imp_http_worker_t *worker, imp_http_pool_t *pool
     if (status != LXB_STATUS_OK)
         goto fail;
 
-    imp_wc_comic_easel_chapter (state, document, worker->client.url);
+    imp_wc_comic_easel_chapter (state, document, worker->client.url, chap);
 
 fail:
     // TODO FAIL
@@ -309,8 +311,7 @@ static void imp__push_chapter (imp_wc_indexer_state_t *state, lxb_dom_attr_t *hr
 
     imp_http_request_t *http_req = imp_http_request_init("GET");
     
-    imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
-    imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
+    imp_http_pool_default_headers(&http_req->headers);
 
     http_req->data = state;
 

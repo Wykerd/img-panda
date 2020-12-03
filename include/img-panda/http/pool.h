@@ -81,6 +81,10 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
 
 void imp_http_pool_shutdown (imp_http_pool_t *pool);
 
+#define imp_http_pool_default_headers(x) \
+    imp_http_headers_push(x, "Connection", "keep-alive"); \
+    imp_http_headers_push(x, "User-Agent", "img-panda/0.1.0")
+
 #ifdef __cplusplus
 }
 #endif

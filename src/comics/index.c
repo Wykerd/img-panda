@@ -64,8 +64,7 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
 
             imp_http_request_t *http_req = imp_http_request_init("GET");
     
-            imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
-            imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
+            imp_http_pool_default_headers(&http_req->headers);
 
             req->request = http_req;
 
@@ -90,8 +89,7 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
 
                     imp_http_request_t *http_req = imp_http_request_init("GET");
 
-                    imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
-                    imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
+                    imp_http_pool_default_headers(&http_req->headers);
 
                     req->request = http_req;
 
@@ -218,8 +216,7 @@ int imp_wc_download_image (imp_wc_indexer_state_t *state, imp_wc_meta_strip_t *s
 
     imp_http_request_t *http_req = imp_http_request_init("GET");
     
-    imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
-    imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
+    imp_http_pool_default_headers(&http_req->headers);
 
     http_req->data = state;
 
@@ -247,8 +244,7 @@ int imp_wc_indexer_run (
 
     imp_http_request_t *http_req = imp_http_request_init("GET");
     
-    imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
-    imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
+    imp_http_pool_default_headers(&http_req->headers);
 
     req->request = http_req;
 
