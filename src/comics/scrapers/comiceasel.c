@@ -5,9 +5,6 @@
 static void imp__strip_page_dl_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
     imp_wc_indexer_state_t *state = worker->last_request->data;
     imp_wc_meta_strip_t *strip = worker->last_request_data;
-    if (strip == NULL) {
-        puts("STRIP IS NULL");
-    }
     lxb_status_t status;
     lxb_html_document_t *document;
 

@@ -195,15 +195,20 @@ int imp_wc_indexer_init (
     imp_wc_meta_index_init (&state->metadata);
 };
 
+static int count = 0;
+
 static void imp__wc_comic_dl (imp_http_worker_t *worker, imp_http_pool_t *pool) {
     imp_wc_indexer_state_t *state = worker->last_request->data;
     imp_wc_meta_strip_t *strip = worker->last_request_data;
     if (state->on_strip_image != NULL)
         state->on_strip_image(state, strip, (uv_buf_t *)&worker->last_response);
     FILE *fd;
-    fd = fopen("/home/wykerd/sources/comic-rip/cool_2.png", "w");
+    char *fpath = calloc(sizeof(char), 60);
+    snprintf(fpath, 60, "/home/wykerd/sources/comic-rip/imgs/%d.png", count++);
+    fd = fopen(fpath, "w");
     fwrite(worker->last_response.base, 1, worker->last_response.len, fd);
     fclose(fd);
+    free(fpath);
 }
 
 int imp_wc_download_image (imp_wc_indexer_state_t *state, imp_wc_meta_strip_t *strip) {
