@@ -41,18 +41,18 @@ cv::Mat imp_ri_blob_to_mat (const void* src) {
 
     size_t cursor = 0;
 
-    memcpy(&rows, src + cursor, sizeof(int));
+    memcpy(&rows, (const void*)((volatile uint8_t *)src + cursor), sizeof(int));
     cursor += sizeof(int);
-    memcpy(&cols, src + cursor, sizeof(int));
+    memcpy(&cols, (const void*)((volatile uint8_t *)src + cursor), sizeof(int));
     cursor += sizeof(int);
-    memcpy(&type, src + cursor, sizeof(int));
+    memcpy(&type, (const void*)((volatile uint8_t *)src + cursor), sizeof(int));
     cursor += sizeof(int);
-    memcpy(&channels, src + cursor, sizeof(int));
+    memcpy(&channels, (const void*)((volatile uint8_t *)src + cursor), sizeof(int));
     cursor += sizeof(int);
 
     cv::Mat mat(rows, cols, type);
 
-    memcpy(mat.data, src + cursor, CV_ELEM_SIZE(type) * rows * cols);
+    memcpy(mat.data, (const void*)((volatile uint8_t *)src + cursor), CV_ELEM_SIZE(type) * rows * cols);
 
     return mat;
 }
