@@ -16,6 +16,7 @@ typedef struct imp_wc_indexer_state_s imp_wc_indexer_state_t;
 typedef void (*imp_wc_indexer_cb)(imp_wc_indexer_state_t *state, int status, int errcode);
 
 typedef void (*imp_wc_indexer_status_cb)(imp_wc_indexer_state_t *state);
+typedef void (*imp_wc_indexer_strip_imgdl_cb)(imp_wc_indexer_state_t *state, imp_wc_meta_strip_t *strip, uv_buf_t *img);
 
 struct imp_wc_indexer_state_s {
     uv_loop_t *loop;
@@ -25,11 +26,14 @@ struct imp_wc_indexer_state_s {
 
     // Events
     imp_wc_indexer_cb on_complete;
+    imp_wc_indexer_strip_imgdl_cb on_strip_image;
 
     // State
     imp_wc_meta_index_t metadata;
+
     // Download track state
     imp_hashmap_t *content;
+    imp_hashmap_t *chapters;
 };
 
 typedef imp_wc_err_t (*imp_scraper_func)(imp_wc_indexer_state_t *state, lxb_html_document_t *document, imp_url_t* url);

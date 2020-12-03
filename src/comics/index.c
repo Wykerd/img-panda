@@ -56,6 +56,7 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
     case META_CMS_WORDPRESS:
         {
             imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
+            memset(req, 0, sizeof(imp_http_worker_request_t));
 
             req->url = imp_url_clone(state->url);
             free(req->url->path);
@@ -79,6 +80,7 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
                 {
 
                     imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
+                    memset(req, 0, sizeof(imp_http_worker_request_t));
 
                     req->url = imp_url_clone(state->url);
                     free(req->url->path);
@@ -123,6 +125,62 @@ fail:
     lxb_html_document_destroy(document);
 };
 
+static int imp__strip_cmp(const void *a, const void *b, void *udata) {
+    const imp_wc_meta_strip_t *sa = a;
+    const imp_wc_meta_strip_t *sb = b;
+
+    return strcmp(sa->src_url->fragment, sb->src_url->fragment) &&
+    strcmp(sa->src_url->host, sb->src_url->host) &&
+    strcmp(sa->src_url->path, sb->src_url->path) &&
+    strcmp(sa->src_url->port, sb->src_url->port) &&
+    strcmp(sa->src_url->query, sb->src_url->query) &&
+    strcmp(sa->src_url->schema, sb->src_url->schema) &&
+    strcmp(sa->src_url->userinfo, sb->src_url->userinfo);
+}
+
+static uint64_t imp__strip_hash(const void *item, uint64_t seed0, uint64_t seed1) {
+    const imp_wc_meta_strip_t *strip = item;
+    const char *format = "%s%s%s%s%s%s%s";
+    int len;
+    len = snprintf(NULL, 0, format, 
+        strip->src_url->fragment, 
+        strip->src_url->host, 
+        strip->src_url->port, 
+        strip->src_url->query, 
+        strip->src_url->schema, 
+        strip->src_url->userinfo, 
+        strip->src_url->path);
+    char *key = malloc(len + 1);
+    snprintf(key, len + 1, format, 
+        strip->src_url->fragment, 
+        strip->src_url->host,
+        strip->src_url->port, 
+        strip->src_url->query, 
+        strip->src_url->schema, 
+        strip->src_url->userinfo,
+        strip->src_url->path);
+    
+    if (key[len - 1] == '/')
+        len--;  // ignore trailing / as it results in the same path
+
+    uint64_t hash = hashmap_sip(key, len, seed0, seed1);
+
+    free(key);
+
+    return hash;
+}
+
+static int imp__chapter_cmp(const void *a, const void *b, void *udata) {
+    const imp_wc_meta_chapter_t *ua = a;
+    const imp_wc_meta_chapter_t *ub = b;
+    return strcmp(ua->id, ub->id);
+}
+
+static uint64_t imp__chapter_hash(const void *item, uint64_t seed0, uint64_t seed1) {
+    const imp_wc_meta_chapter_t *chapter = item;
+    return hashmap_sip(chapter->id, chapter->id_len, seed0, seed1);
+}
+
 int imp_wc_indexer_init (
     uv_loop_t *loop, 
     imp_wc_indexer_state_t *state
@@ -135,8 +193,44 @@ int imp_wc_indexer_init (
 
     state->pool.data = state;  
 
+    state->content = hashmap_new(sizeof(imp_wc_meta_strip_t), 256, 0, 0, imp__strip_hash, imp__strip_cmp, NULL);
+    state->chapters = hashmap_new(sizeof(imp_wc_meta_chapter_t), 0, 0, 0, imp__chapter_hash, imp__chapter_cmp, NULL);
+
     imp_wc_meta_index_init (&state->metadata);
 };
+
+static void imp__wc_comic_dl (imp_http_worker_t *worker, imp_http_pool_t *pool) {
+    imp_wc_indexer_state_t *state = worker->last_request->data;
+    imp_wc_meta_strip_t *strip = worker->last_request_data;
+    if (state->on_strip_image != NULL)
+        state->on_strip_image(state, strip, (uv_buf_t *)&worker->last_response);
+    FILE *fd;
+    fd = fopen("/home/wykerd/sources/comic-rip/cool_2.png", "w");
+    fwrite(worker->last_response.base, 1, worker->last_response.len, fd);
+    fclose(fd);
+}
+
+int imp_wc_download_image (imp_wc_indexer_state_t *state, imp_wc_meta_strip_t *strip) {
+    imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
+    memset(req, 0, sizeof(imp_http_worker_request_t));
+
+    req->url = imp_url_dup(strip->img_url);
+
+    imp_http_request_t *http_req = imp_http_request_init("GET");
+    
+    imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
+    imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
+
+    http_req->data = state;
+
+    req->request = http_req;
+
+    req->data = strip;
+
+    req->on_response = imp__wc_comic_dl;
+
+    imp_http_pool_request(&state->pool, req);
+}
 
 int imp_wc_indexer_run (
     imp_wc_indexer_state_t *state, 
@@ -145,6 +239,7 @@ int imp_wc_indexer_run (
 ) {
 
     imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
+    memset(req, 0, sizeof(imp_http_worker_request_t));
 
     req->url = imp_parse_url(url, url_len);
 

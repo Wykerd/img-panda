@@ -1,8 +1,9 @@
 #include "img-panda/comics/scrapers/comiceasel.h"
+#include "lexbor/html/serialize.h"
 // TODO null checks
 
 imp_wc_err_t imp_wc_comic_easel_chapter_page (imp_wc_indexer_state_t *state, lxb_html_document_t *document, imp_url_t* url) {
-
+    
 }
 
 imp_wc_err_t imp_wc_comic_easel_chapter (imp_wc_indexer_state_t *state, lxb_html_document_t *document, imp_url_t* url) {
@@ -28,7 +29,7 @@ imp_wc_err_t imp_wc_comic_easel_chapter (imp_wc_indexer_state_t *state, lxb_html
 
     status = lxb_dom_elements_by_attr_contain (
         lxb_dom_interface_element(document->body), collection,
-        "value", 5,
+        "href", 4,
         chapter_pre, chapter_pre_len - 1,
         true
     ); 
@@ -47,15 +48,18 @@ imp_wc_err_t imp_wc_comic_easel_chapter (imp_wc_indexer_state_t *state, lxb_html
         chapter_anchor = lxb_dom_collection_element(collection, i);
 
         href_attr = lxb_dom_element_attr_by_name(chapter_anchor, "href", 4);
-
+        if (href_attr == NULL) continue;        
+        
         int pos = memsearch(href_attr->value->data, href_attr->value->length, chapter_pre, chapter_pre_len);
 
         size_t cursor = pos + chapter_pre_len;
 
-        max_page = atoll (href_attr->value->data + cursor);
-
-        if (href_attr == NULL) continue;
+        size_t cur_page = atoll (href_attr->value->data + cursor);
+        if (cur_page > max_page)
+            max_page = cur_page;
     };
+
+
 cleanup:
     free (chapter_pre);
     lxb_dom_collection_destroy(collection, true);
@@ -76,7 +80,7 @@ imp_wc_err_t imp_wc_comic_easel_scrape (imp_wc_indexer_state_t *state, lxb_html_
     lxb_status_t status;
     imp_wc_err_t err = E_WC_OK;
 
-    imp_wc_meta_strip_t *strip = hashmap_get(state->content, &(imp_wc_meta_strip_t){ .img_url = url });
+    imp_wc_meta_strip_t *strip = hashmap_get(state->content, &(imp_wc_meta_strip_t){ .src_url = url });
 
     if ((strip != NULL) && (strip->is_scraped > 0))
         return E_WC_OK;
@@ -205,7 +209,7 @@ err_prev:
     };
 
     imp_url_t *prev_src = strip->img_url;
-        
+    
     strip->img_url = imp_parse_url(
     strip_src->value->data, 
     strip_src->value->length);
@@ -227,12 +231,97 @@ err_prev:
     // TODO NULL + errs
     hashmap_set(state->content, strip);
 
-    // imp_wc_download_image (state, strip);
+    imp_wc_download_image (state, strip);
 
 cleanup:
     lxb_dom_collection_destroy(collection, true);
     return err;
 };
+
+static void imp__chapter_dl_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
+    imp_wc_indexer_state_t *state = worker->last_request->data;
+    imp_wc_meta_chapter_t *chap = worker->last_request_data;
+    lxb_status_t status;
+    lxb_html_document_t *document;
+
+    document = lxb_html_document_create();
+    if (document == NULL)
+        goto fail;
+
+    status = lxb_html_document_parse(document, worker->last_response.base, worker->last_response.len);
+    if (status != LXB_STATUS_OK)
+        goto fail;
+
+    imp_wc_comic_easel_chapter (state, document, worker->client.url);
+
+fail:
+    // TODO FAIL
+    lxb_html_document_destroy(document);
+}
+
+inline
+static void imp__push_chapter (imp_wc_indexer_state_t *state, lxb_dom_attr_t *href_attr, lexbor_str_t *chaptr_name) {
+    char *str = calloc(1, href_attr->value->length + 1);
+    memcpy(str, href_attr->value->data, href_attr->value->length);
+    char *tok;
+    tok = strtok(str, "/");
+        
+    while (tok != NULL) {
+        char* p = strtok(NULL, "/");
+        if (p == NULL) break;
+        tok = p;
+    };
+    size_t id_len = strlen(tok);
+    
+    imp_wc_meta_chapter_t *chap;
+    chap = hashmap_get(state->chapters, &(imp_wc_meta_chapter_t){ .id = tok, .id_len = id_len });
+    
+    if (chap == NULL)
+        chap = calloc(1, sizeof(imp_wc_meta_chapter_t));
+
+    if (chap->id != NULL)
+        free(chap->id);
+
+    chap->id = strdup(tok);
+    chap->id_len = id_len;
+
+    if (chap->name != NULL)
+        free(chap->name);
+
+    chap->name = calloc(1, chaptr_name->length + 1);
+    memcpy(chap->name, chaptr_name->data, chaptr_name->length);
+
+    if (chap->url != NULL)
+        imp_url_free(chap->url);
+
+    chap->url = imp_parse_url(href_attr->value->data, href_attr->value->length);
+
+    hashmap_set(state->chapters, chap);
+
+    free(str);
+
+    // now pull it :-)
+    if (chap->url == NULL) return;
+    imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
+    memset(req, 0, sizeof(imp_http_worker_request_t));
+
+    req->url = imp_url_dup(chap->url);
+
+    imp_http_request_t *http_req = imp_http_request_init("GET");
+    
+    imp_http_headers_push(&http_req->headers, "Connection", "keep-alive");
+    imp_http_headers_push(&http_req->headers, "User-Agent", "img-panda/0.1.0");
+
+    http_req->data = state;
+
+    req->request = http_req;
+
+    req->data = chap;
+
+    req->on_response = imp__chapter_dl_cb;
+
+    imp_http_pool_request(&state->pool, req);
+}
 
 imp_wc_err_t imp_wc_comic_easel_crawl (imp_wc_indexer_state_t *state, lxb_html_document_t *document, imp_url_t* url) {
     lxb_status_t status;
@@ -256,6 +345,7 @@ imp_wc_err_t imp_wc_comic_easel_crawl (imp_wc_indexer_state_t *state, lxb_html_d
 
     lxb_dom_element_t *chapter_anchor;
     lxb_dom_attr_t *href_attr;
+    lexbor_str_t *chaptr_name;
 
     for (size_t i = 0; i < lxb_dom_collection_length(collection); i++) {
         chapter_anchor = lxb_dom_collection_element(collection, i);
@@ -264,8 +354,45 @@ imp_wc_err_t imp_wc_comic_easel_crawl (imp_wc_indexer_state_t *state, lxb_html_d
 
         if (href_attr == NULL) continue;
 
-        // DUMP_ATTRIBUTE(href_attr, "CHAPTER");
+        DUMP_ATTRIBUTE(href_attr, "CHAPTER");
+        chaptr_name = imp_node_text(chapter_anchor);
+
+        if (chaptr_name == NULL) continue;
+        
+        imp__push_chapter(state, href_attr, chaptr_name);
     };
+
+    if (lxb_dom_collection_length(collection) == 0) {
+        // try using a[tag=href] instead.
+        lxb_dom_collection_clean(collection);
+
+        status = lxb_dom_elements_by_attr_contain (
+            lxb_dom_interface_element(document->body), collection,
+            "href", 4,
+            "/chapter/", 9,
+            true
+        );
+
+        if (status != LXB_STATUS_OK) {
+            err = E_WC_FIND_META;
+            goto cleanup;
+        };
+
+        for (size_t i = 0; i < lxb_dom_collection_length(collection); i++) {
+            chapter_anchor = lxb_dom_collection_element(collection, i);
+
+            href_attr = lxb_dom_element_attr_by_name(chapter_anchor, "href", 4);
+
+            if (href_attr == NULL) continue;
+
+            DUMP_ATTRIBUTE(href_attr, "CHAPTER");
+            chaptr_name = imp_node_text(chapter_anchor);
+
+            if (chaptr_name == NULL) continue;
+            
+            imp__push_chapter(state, href_attr, chaptr_name);
+        };
+    }
 
     lxb_dom_collection_clean(collection);
 

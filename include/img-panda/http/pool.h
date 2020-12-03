@@ -33,6 +33,7 @@ struct imp_http_worker_s {
     imp_http_request_t *last_request;
     uv_buf_t *last_request_buf;
     uv_buf_t *last_request_body;
+    void* last_request_data;
     imp_reusable_buf_t last_response;
 
     // Status
@@ -42,6 +43,7 @@ struct imp_http_worker_s {
 
     // Parent
     imp_http_pool_t *pool;
+    size_t pos;
 };
 
 typedef struct imp_http_worker_list_s {

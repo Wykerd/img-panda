@@ -44,8 +44,6 @@ void imp_wc_meta_strip_free (imp_wc_meta_strip_t *page) {
         imp_url_free(page->previous_url);
     if (page->img_url != NULL)
         imp_url_free(page->img_url);
-    if (page->chapter != NULL) 
-        imp_url_free(page->chapter);
 };
 
 
@@ -174,10 +172,12 @@ imp_wc_err_t imp_wc_meta_process_index (imp_wc_meta_index_t *page, lxb_html_docu
 }
 
 imp_wc_err_t imp_wc_meta_process_strip (imp_wc_meta_index_t *index, imp_wc_meta_strip_t *page, 
-                                           lxb_html_document_t *document, imp_url_t* url) 
+                                        lxb_html_document_t *document, imp_url_t* url) 
 {
     lxb_status_t status;
     lxb_dom_collection_t *metas;
+
+    page->src_url = imp_url_dup(url);
 
     CHK_N_EQ(metas, lxb_dom_collection_make(&document->dom_document, 16), NULL, E_WC_CREATE_COLLECTION);
 
@@ -209,15 +209,15 @@ imp_wc_err_t imp_wc_meta_process_strip (imp_wc_meta_index_t *index, imp_wc_meta_
                         if (!memcmp(property_attr->value->data, "og:image", 8)) {
                             if (page->img_url == NULL) {
                                 DUMP_IDENTIFIER("Image URL");
-                                page->img_url = imp_parse_url(property_attr->value->data, property_attr->value->length);
+                                page->img_url = imp_parse_url(content_attr->value->data, content_attr->value->length);
                             }
                         } else if (!memcmp(property_attr->value->data, "og:title", 8)) {
                             if (page->img_title.priority < 1) {
                                 DUMP_IDENTIFIER("Image Title");
                                 page->img_title.priority = 1;
-                                page->img_title.data.base = realloc(page->img_title.data.base, property_attr->value->length);
-                                memcpy(page->img_title.data.base, property_attr->value->data, property_attr->value->length);
-                                page->img_title.data.len = property_attr->value->length;
+                                page->img_title.data.base = realloc(page->img_title.data.base, content_attr->value->length);
+                                memcpy(page->img_title.data.base, content_attr->value->data, content_attr->value->length);
+                                page->img_title.data.len = content_attr->value->length;
                             }
                         }
                     }
@@ -228,23 +228,23 @@ imp_wc_err_t imp_wc_meta_process_strip (imp_wc_meta_index_t *index, imp_wc_meta_
                         if (!memcmp(property_attr->value->data, "og:image:url", 12)) {
                             if (page->img_url == NULL) {
                                 DUMP_IDENTIFIER("Image URL");
-                                page->img_url = imp_parse_url(property_attr->value->data, property_attr->value->length);
+                                page->img_url = imp_parse_url(content_attr->value->data, content_attr->value->length);
                             }
                         } else if (!memcmp(property_attr->value->data, "og:image:alt", 12)) {
                             if (page->img_desc.priority < 1) {
                                 DUMP_IDENTIFIER("Image Description");
                                 page->img_desc.priority = 1;
-                                page->img_desc.data.base = realloc(page->img_desc.data.base, property_attr->value->length);
-                                memcpy(page->img_desc.data.base, property_attr->value->data, property_attr->value->length);
-                                page->img_desc.data.len = property_attr->value->length;
+                                page->img_desc.data.base = realloc(page->img_desc.data.base, content_attr->value->length);
+                                memcpy(page->img_desc.data.base, content_attr->value->data, content_attr->value->length);
+                                page->img_desc.data.len = content_attr->value->length;
                             }
                         } else if (!memcmp(property_attr->value->data, "og:site_name", 12)) {
                             if (index->site_title.priority < 1) {
                                 DUMP_IDENTIFIER("Site Name");
                                 index->site_title.priority = 1;
-                                index->site_title.data.base = realloc(index->site_title.data.base, property_attr->value->length);
-                                memcpy(index->site_title.data.base, property_attr->value->data, property_attr->value->length);
-                                index->site_title.data.len = property_attr->value->length;
+                                index->site_title.data.base = realloc(index->site_title.data.base, content_attr->value->length);
+                                memcpy(index->site_title.data.base, content_attr->value->data, content_attr->value->length);
+                                index->site_title.data.len = content_attr->value->length;
                             }
                         }
                     }
@@ -256,9 +256,9 @@ imp_wc_err_t imp_wc_meta_process_strip (imp_wc_meta_index_t *index, imp_wc_meta_
                             if (page->img_desc.priority < 2) {
                                 DUMP_IDENTIFIER("Image Description");
                                 page->img_desc.priority = 2;
-                                page->img_desc.data.base = realloc(page->img_desc.data.base, property_attr->value->length);
-                                memcpy(page->img_desc.data.base, property_attr->value->data, property_attr->value->length);
-                                page->img_desc.data.len = property_attr->value->length;
+                                page->img_desc.data.base = realloc(page->img_desc.data.base, content_attr->value->length);
+                                memcpy(page->img_desc.data.base, content_attr->value->data, content_attr->value->length);
+                                page->img_desc.data.len = content_attr->value->length;
                             }
                         }
                     }

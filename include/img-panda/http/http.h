@@ -28,6 +28,7 @@ typedef struct imp_http_client_s imp_http_client_t;
 typedef struct imp_http_request_s {
     imp_http_headers_t headers;
     char* method;
+    void *data; // opaque
 } imp_http_request_t;
 
 typedef void (*imp_http_client_status_cb)(imp_http_client_t *client, imp_net_status_t *status);

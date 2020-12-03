@@ -10,6 +10,7 @@ extern "C" {
 #include <stddef.h>
 #include <lexbor/html/parser.h>
 #include <lexbor/dom/interfaces/element.h>
+#include <lexbor/dom/interfaces/text.h>
 
 typedef enum imp_meta_flag {
     META_NONE,
@@ -44,19 +45,43 @@ typedef struct imp_wc_meta_index_s {
     imp_url_t *last_url;
 } imp_wc_meta_index_t;
 
+typedef struct imp_wc_meta_chapter_s {
+    imp_url_t *url;
+    char* id; // although we store id_len this must still be a null terminated c str.
+    size_t id_len;
+    char *name;
+} imp_wc_meta_chapter_t;
+
 typedef struct imp_wc_meta_strip_s {
     imp_wc_meta_content_t img_title;
     imp_wc_meta_content_t img_desc;
     imp_wc_meta_list_t    tags;
 
+    imp_url_t *src_url;
+
     imp_url_t *img_url;
     imp_url_t *next_url;
     imp_url_t *previous_url;
 
-    imp_url_t *chapter;
+    imp_wc_meta_chapter_t *chapter;
     int is_scraped;
     int is_downloaded;
 } imp_wc_meta_strip_t;
+
+inline 
+static lexbor_str_t *imp_node_text (lxb_dom_element_t *el) {
+    if ((el->node.first_child != NULL) && 
+        !lxb_html_node_is_void(el->node.first_child) && 
+        (el->node.first_child->type == LXB_DOM_NODE_TYPE_TEXT)) 
+    {
+        lxb_dom_text_t *text = lxb_dom_interface_text(el->node.first_child);
+        lexbor_str_t *data = &text->char_data.data;
+
+        return data;
+    } 
+    else 
+        return NULL;
+}
 
 int imp_wc_meta_index_init (imp_wc_meta_index_t *page);
 int imp_wc_meta_strip_init (imp_wc_meta_strip_t *page);

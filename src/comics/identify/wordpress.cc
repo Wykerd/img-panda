@@ -27,7 +27,7 @@ int imp_parse_wordpress_site_info_json (imp_wc_meta_index_t *page, imp_buf_t *js
             page->site_title.data.len = site_name.length();
             memcpy(page->site_title.data.base, site_name.begin(), site_name.length());
             page->site_title.priority = -1;
-            std::cout << "Identified Site Name: " << site_name << std::endl;
+            std::cout << ">>> Identified Site Name: " << site_name << std::endl;
         }
     };
 
@@ -42,7 +42,7 @@ int imp_parse_wordpress_site_info_json (imp_wc_meta_index_t *page, imp_buf_t *js
             page->site_desc.data.len = site_desc.length();
             memcpy(page->site_desc.data.base, site_desc.begin(), site_desc.length());
             page->site_desc.priority = -1;
-            std::cout << "Identified Comic Description: " << site_desc << std::endl;
+            std::cout << ">>> Identified Comic Description: " << site_desc << std::endl;
         }
     };
 
