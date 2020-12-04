@@ -55,6 +55,7 @@ find_package(OpenSSL REQUIRED)
 find_package(UV REQUIRED)
 find_package(OpenCV REQUIRED core imgproc imgcodecs features2d)
 find_package(SQLite3 REQUIRED)
+find_package(Threads REQUIRED)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include 
@@ -82,4 +83,6 @@ target_link_libraries(ripper
     ${OpenCV_LIBS} 
     # DB Clients
     SQLite::SQLite3
+    # Theads
+    Threads::Threads
 )

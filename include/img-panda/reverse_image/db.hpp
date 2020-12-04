@@ -14,8 +14,8 @@ typedef struct imp_ri_kpdesc_s {
 
 typedef struct imp_ri_imgs_s {
     cv::Mat matrix;
-    std::unordered_map<int, std::string> uris;
-    std::unordered_map<int, int> ids;
+    std::unordered_map<size_t, std::string> uris;
+    std::unordered_map<size_t, size_t> ids;
     size_t ids_len;
     size_t max_id;
 } imp_ri_imgs_t;

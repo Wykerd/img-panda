@@ -7,11 +7,15 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <unordered_map>
+#include <thread>
+#include <iterator>
 
 // Internal state
 typedef struct imp_ri_intr_state_s {
     imp_ri_imgs_t imgs;
+    std::vector<cv::Mat> dist_matrix;
     cv::FlannBasedMatcher matcher;
+    size_t jobs;
 } imp_ri_intr_state_t;
 
 inline
@@ -28,6 +32,20 @@ static cv::Mat imp__ri_load_grayscale (imp_buf_t *buf, size_t max_area = -1) {
     };
     return src;
 };
+
+inline
+static void imp__ri_build_dist_matrix (imp_ri_intr_state_t *intr_s) {
+    intr_s->dist_matrix.clear();
+    size_t rows_per_worker = intr_s->imgs.ids_len / intr_s->jobs,
+           row_offset = 0;
+
+    for (size_t i = 0; i < intr_s->jobs - 1; i++) {
+        intr_s->dist_matrix.push_back(intr_s->imgs.matrix.rowRange(row_offset, row_offset + rows_per_worker));
+        row_offset += rows_per_worker;
+    };
+
+    intr_s->dist_matrix.push_back(intr_s->imgs.matrix.rowRange(row_offset, intr_s->imgs.ids_len));
+}
 
 static imp_ri_kpdesc_t imp__ri_compute_descriptor (cv::Mat &src) {
     cv::Ptr<cv::BRISK> detector = cv::BRISK::create(120);
@@ -55,6 +73,8 @@ static int imp__ri_add_img (imp_ri_intr_state_t *state, cv::Mat &src, const char
 
     state->imgs.ids_len = state->imgs.matrix.rows;
 
+    imp__ri_build_dist_matrix(state);
+
     return imp_ri_db_add_img(db, desc.desc, uri);
 };
 
@@ -71,27 +91,40 @@ static bool imp__ri_freq_compare(std::pair<size_t, size_t> p1, std::pair<size_t,
     return p1.second > p2.second;
 }
 
+static void imp__ri_knn (cv::Mat &descr, imp_ri_intr_state_t *intr_state, 
+                         imp_ri_kpdesc_t &desc, std::unordered_map<size_t, size_t> &freq) 
+{
+    std::vector<std::vector<cv::DMatch>> knn_matches;
+    const float ratio_thresh = 0.6f;
+    intr_state->matcher.knnMatch(descr, desc.desc, knn_matches, 2);
+    for (size_t i = 0; i < knn_matches.size(); i++) 
+        if ((knn_matches[i].size() > 1) && (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance))
+            freq[intr_state->imgs.ids[i]]++;
+};
+
 inline
 static imp_ri_matches_t *imp__ri_match_img (imp_ri_state_t *state, cv::Mat &mat, size_t k) {
     if (mat.empty()) 
         return NULL;
 
-    auto desc = imp__ri_compute_descriptor(mat);
+    imp_ri_kpdesc_t desc = imp__ri_compute_descriptor(mat);
 
     imp_ri_intr_state_t *intr_state = static_cast<imp_ri_intr_state_t *>(state->data);
 
-    std::vector< std::vector<cv::DMatch> > knn_matches;
-    intr_state->matcher.knnMatch(intr_state->imgs.matrix, desc.desc, knn_matches, 2);
+    std::vector<std::thread> workers;
 
-    const float ratio_thresh = 0.6f;
+    std::unordered_map<size_t, std::unordered_map<size_t, size_t>> freqs;
 
-    std::unordered_map<size_t, size_t> freq;
+    for (size_t i = 0; i < intr_state->jobs; i++) {
+        workers.push_back(std::thread(imp__ri_knn, std::ref(intr_state->dist_matrix[i]), intr_state, std::ref(desc), std::ref(freqs[i])));
+    }
 
-    for (size_t i = 0; i < knn_matches.size(); i++) 
-        if ((knn_matches[i].size() > 1) && (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance))
-            freq[intr_state->imgs.ids[i]]++;
+    std::vector<std::pair<size_t, size_t>> freq_vec;
 
-    std::vector<std::pair<size_t, size_t>> freq_vec(freq.begin(), freq.end());
+    for (size_t i = 0; i < intr_state->jobs; i++) {
+        workers[i].join();
+        freq_vec.insert(freq_vec.end(), freqs[i].begin(), freqs[i].end());
+    };
 
     std::sort(freq_vec.begin(), freq_vec.end(), imp__ri_freq_compare);
 
@@ -134,15 +167,20 @@ const char* imp_ri_get_uri_from_id (imp_ri_state_t *state, size_t id) {
 int imp_ri_state_load (imp_ri_state_t *state) {
     imp_ri_intr_state_t *intr_s = static_cast<imp_ri_intr_state_t *>(state->data);
     if (!imp_ri_db_get_imgs(state->db, &intr_s->imgs)) return 0;
+    imp__ri_build_dist_matrix(intr_s);
     return 1;
 };
 
-int imp_ri_state_init (uv_loop_t *loop, imp_ri_state_t *state, size_t jobs) {
+int imp_ri_state_init (uv_loop_t *loop, imp_ri_state_t *state, size_t fallback_jobs) {
     try
     {
         state->loop = loop;
         imp_ri_intr_state_t *intr_state = new imp_ri_intr_state_t;
         intr_state->matcher = cv::FlannBasedMatcher(cv::makePtr<cv::flann::LshIndexParams>(12, 20, 2));
+        
+        intr_state->jobs = std::thread::hardware_concurrency();
+        if (intr_state->jobs == 0)
+            intr_state->jobs = fallback_jobs;
         
         intr_state->imgs.ids_len = 0;
         state->data = (void *)intr_state;

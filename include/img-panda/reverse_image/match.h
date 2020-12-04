@@ -32,7 +32,7 @@ typedef struct imp_ri_matches_s {
  * Free state initialized with this method with imp_ri_state_free
  * Returns 0 on malloc error and 1 elsewise
  */
-int imp_ri_state_init (uv_loop_t *loop, imp_ri_state_t *state, size_t jobs);
+int imp_ri_state_init (uv_loop_t *loop, imp_ri_state_t *state, size_t fallback_jobs);
 /**
  * Free the state
  */
