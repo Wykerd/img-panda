@@ -190,7 +190,7 @@ int imp_ri_state_init (uv_loop_t *loop, imp_ri_state_t *state, size_t fallback_j
     {
         state->loop = loop;
         imp_ri_intr_state_t *intr_state = new imp_ri_intr_state_t;
-        intr_state->matcher = cv::FlannBasedMatcher(cv::makePtr<cv::flann::LshIndexParams>(12, 20, 2));
+        intr_state->matcher = cv::FlannBasedMatcher(cv::makePtr<cv::flann::LshIndexParams>(3, 20, 2)); // docs recommend 12, 20, 2 but this is much faster
         
         intr_state->jobs = std::thread::hardware_concurrency();
         if (intr_state->jobs == 0)
