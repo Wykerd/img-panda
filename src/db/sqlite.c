@@ -4,7 +4,7 @@
 static const char *imp__sqlite_create_tables[] = {
     "CREATE TABLE IF NOT EXISTS images ("
         "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
-        "uri TEXT NOT NULL,"
+        "uri TEXT NOT NULL UNIQUE,"
         "descriptors BLOB NOT NULL"
     ")",
 };

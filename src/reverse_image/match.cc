@@ -48,15 +48,11 @@ static int imp__ri_add_img (imp_ri_intr_state_t *state, cv::Mat &src, const char
     auto desc = imp__ri_compute_descriptor(src);
 
     state->imgs.matrix.push_back(desc.desc);
-    state->imgs.uris.push_back(std::string(uri));
-
-    size_t id = state->imgs.ids_len > 0 ? state->imgs.ids[state->imgs.ids_len - 1] + 1 : 1;
+    state->imgs.uris[++state->imgs.max_id] = std::string(uri);
     
-    state->imgs.ids = (int *)realloc(state->imgs.ids, state->imgs.matrix.rows * sizeof(int));
-    if (state->imgs.ids == NULL) return 0;
-    for (int i = state->imgs.ids_len; i < state->imgs.matrix.rows; i++) {
-        state->imgs.ids[i] = id;
-    };
+    for (int i = state->imgs.ids_len; i < state->imgs.matrix.rows; i++)
+        state->imgs.ids[i] = state->imgs.max_id;
+
     state->imgs.ids_len = state->imgs.matrix.rows;
 
     return imp_ri_db_add_img(db, desc.desc, uri);
@@ -77,6 +73,9 @@ static bool imp__ri_freq_compare(std::pair<size_t, size_t> p1, std::pair<size_t,
 
 inline
 static imp_ri_matches_t *imp__ri_match_img (imp_ri_state_t *state, cv::Mat &mat, size_t k) {
+    if (mat.empty()) 
+        return NULL;
+
     auto desc = imp__ri_compute_descriptor(mat);
 
     imp_ri_intr_state_t *intr_state = static_cast<imp_ri_intr_state_t *>(state->data);
@@ -129,7 +128,7 @@ void imp_ri_match_free (imp_ri_matches_t *matches) {
 
 const char* imp_ri_get_uri_from_id (imp_ri_state_t *state, size_t id) {
     imp_ri_intr_state_t *intr_s = static_cast<imp_ri_intr_state_t *>(state->data);
-    return intr_s->imgs.uris[id - 1].c_str(); // id is 1 index in db and 0 index in vector
+    return intr_s->imgs.uris[id].c_str();
 }
 
 int imp_ri_state_load (imp_ri_state_t *state) {
@@ -138,17 +137,13 @@ int imp_ri_state_load (imp_ri_state_t *state) {
     return 1;
 };
 
-int imp_ri_state_init (imp_ri_state_t *state) {
+int imp_ri_state_init (uv_loop_t *loop, imp_ri_state_t *state, size_t jobs) {
     try
     {
+        state->loop = loop;
         imp_ri_intr_state_t *intr_state = new imp_ri_intr_state_t;
         intr_state->matcher = cv::FlannBasedMatcher(cv::makePtr<cv::flann::LshIndexParams>(12, 20, 2));
         
-        intr_state->imgs.ids = (int *)malloc(sizeof(int));
-        if (intr_state->imgs.ids == NULL) {
-            delete intr_state;
-            return 0;
-        };
         intr_state->imgs.ids_len = 0;
         state->data = (void *)intr_state;
         state->max_area = -1;
@@ -160,12 +155,7 @@ int imp_ri_state_init (imp_ri_state_t *state) {
     };
 };
 
-int imp_ri_state_verify_integrity (imp_ri_state_t *state) {
-    return static_cast<imp_ri_intr_state_t *>(state->data)->imgs.ids != NULL;
-};
-
 void imp_ri_state_free (imp_ri_state_t *state) {
-    free(static_cast<imp_ri_intr_state_t *>(state->data)->imgs.ids);
     delete (static_cast<imp_ri_intr_state_t *>(state->data));
 };
 

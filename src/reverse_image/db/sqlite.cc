@@ -8,7 +8,7 @@ int imp_ri_db_sqlite_add_img (imp_db_t *db, cv::Mat &desc, const char* uri) {
     sqlite3_stmt* stmt;
     int rc;
 
-    rc = sqlite3_prepare((sqlite3*)db->conn, "INSERT INTO images (uri, descriptors) VALUES (?, ?)", -1, &stmt, 0);
+    rc = sqlite3_prepare((sqlite3*)db->conn, "REPLACE INTO images (uri, descriptors) VALUES (?, ?)", -1, &stmt, 0);
 
     size_t len;
     char* blob = imp_ri_mat_to_blob(desc, len);
@@ -39,13 +39,14 @@ int imp_ri_db_sqlite_get_imgs (imp_db_t *db, imp_ri_imgs_t *imgs) {
         std::string uri = (const char*)sqlite3_column_text(stmt, 1);
         cv::Mat desc = imp_ri_blob_to_mat(sqlite3_column_blob(stmt, 2));
         imgs->matrix.push_back(desc);
-        imgs->uris.push_back(uri);
+        imgs->uris[id] = uri;
 
-        imgs->ids = (int *)realloc(imgs->ids, imgs->matrix.rows * sizeof(int));
-        if (imgs->ids == NULL) return 0;
-        for (int i = imgs->ids_len; i < imgs->matrix.rows; i++) {
+        for (int i = imgs->ids_len; i < imgs->matrix.rows; i++)
             imgs->ids[i] = id;
-        };
+        
+        if (id > imgs->max_id)
+            imgs->max_id = id;
+
         imgs->ids_len = imgs->matrix.rows;
         rc = sqlite3_step(stmt);
     }

@@ -6,9 +6,11 @@ extern "C" {
 #endif
 
 #include "img-panda/db.h"
+#include <uv.h>
 
 // Structure hosting all the C++ classes and matrices for feature detection
 typedef struct imp_ri_state_s {
+    uv_loop_t *loop;
     imp_db_t *db;
     size_t max_area;
     void *data; // C++ Internal data
@@ -30,16 +32,15 @@ typedef struct imp_ri_matches_s {
  * Free state initialized with this method with imp_ri_state_free
  * Returns 0 on malloc error and 1 elsewise
  */
-int imp_ri_state_init (imp_ri_state_t *state);
+int imp_ri_state_init (uv_loop_t *loop, imp_ri_state_t *state, size_t jobs);
 /**
  * Free the state
  */
 void imp_ri_state_free (imp_ri_state_t *state);
 /** 
- * Returns 0 on error and 1 on success - if error you MUST call imp_ri_state_verify_integrity
+ * Returns 0 on error and 1 on success
  */
 int imp_ri_state_load (imp_ri_state_t *state);
-int imp_ri_state_verify_integrity (imp_ri_state_t *state);
 
 /// Matching
 /** 
@@ -58,7 +59,7 @@ const char* imp_ri_get_uri_from_id (imp_ri_state_t *state, size_t id);
 
 /// Appending
 /** 
- * Returns NULL on error - if error you MUST call imp_ri_state_verify_integrity
+ * Returns NULL on error
  */
 int imp_ri_add_img (imp_ri_state_t *state, imp_buf_t *img, const char *uri);
 

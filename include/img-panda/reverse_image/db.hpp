@@ -3,6 +3,7 @@
 
 #include "img-panda/db.h"
 #include <opencv2/core.hpp>
+#include <unordered_map>
 
 #define MAT_BLOB_HEADER_LEN (sizeof(int) * 4)
 
@@ -13,10 +14,18 @@ typedef struct imp_ri_kpdesc_s {
 
 typedef struct imp_ri_imgs_s {
     cv::Mat matrix;
-    std::vector<std::string> uris;
-    int* ids;
+    std::unordered_map<int, std::string> uris;
+    std::unordered_map<int, int> ids;
     size_t ids_len;
+    size_t max_id;
 } imp_ri_imgs_t;
+
+typedef struct imp_ri_distributed_imgs_s {
+    std::vector<imp_ri_imgs_t> imgs;
+    size_t current_index;
+    size_t size;
+    size_t max_id;
+} imp_ri_distributed_imgs_t;
 
 inline
 void imp_ri_blob_free (void *src) {

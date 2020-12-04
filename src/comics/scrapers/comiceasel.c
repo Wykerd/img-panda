@@ -241,7 +241,7 @@ imp_wc_err_t imp_wc_comic_easel_scrape (imp_wc_indexer_state_t *state, lxb_html_
 
     imp_wc_meta_strip_t *strip = hashmap_get(state->content, &(imp_wc_meta_strip_t){ .src_url = url });
 
-    if ((strip != NULL) && (strip->is_scraped > 0))
+    if ((strip != NULL) && strip->is_scraped)
         return E_WC_OK;
 
     if (strip == NULL) {
