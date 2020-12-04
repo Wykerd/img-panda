@@ -100,15 +100,10 @@ static bool imp__ri_freq_compare(std::pair<size_t, size_t> p1, std::pair<size_t,
     return p1.second > p2.second;
 }
 
-static void imp__ri_knn (cv::Mat &descr, imp_ri_intr_state_t *intr_state, 
-                         imp_ri_kpdesc_t &desc, std::unordered_map<size_t, size_t> &freq) 
+static void imp__ri_knn (cv::Mat &descr, std::vector<std::vector<cv::DMatch>> &knn_matches, 
+                         imp_ri_intr_state_t *intr_state, imp_ri_kpdesc_t &desc) 
 {
-    std::vector<std::vector<cv::DMatch>> knn_matches;
-    const float ratio_thresh = 0.6f;
     intr_state->matcher.knnMatch(descr, desc.desc, knn_matches, 2);
-    for (size_t i = 0; i < knn_matches.size(); i++) 
-        if ((knn_matches[i].size() > 1) && (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance))
-            freq[intr_state->imgs.ids[i]]++;
 };
 
 inline
@@ -120,20 +115,30 @@ static imp_ri_matches_t *imp__ri_match_img (imp_ri_state_t *state, cv::Mat &mat,
 
     imp_ri_intr_state_t *intr_state = static_cast<imp_ri_intr_state_t *>(state->data);
 
+    std::vector<std::vector<cv::DMatch>> knn_matches;
+
+    std::unordered_map<size_t, std::vector<std::vector<cv::DMatch>>> knns;
+
     std::vector<std::thread> workers;
 
-    std::unordered_map<size_t, std::unordered_map<size_t, size_t>> freqs;
-
     for (size_t i = 0; i < intr_state->jobs; i++) {
-        workers.push_back(std::thread(imp__ri_knn, std::ref(intr_state->dist_matrix[i]), intr_state, std::ref(desc), std::ref(freqs[i])));
+        workers.push_back(std::thread(imp__ri_knn, std::ref(intr_state->dist_matrix[i]), std::ref(knns[i]), intr_state, std::ref(desc)));
     }
-
-    std::vector<std::pair<size_t, size_t>> freq_vec;
 
     for (size_t i = 0; i < intr_state->jobs; i++) {
         workers[i].join();
-        freq_vec.insert(freq_vec.end(), freqs[i].begin(), freqs[i].end());
-    };
+        knn_matches.insert(knn_matches.end(), std::make_move_iterator(knns[i].begin()), std::make_move_iterator(knns[i].end()));
+    } 
+
+    std::unordered_map<size_t, size_t> freq;
+
+    const float ratio_thresh = 0.6f;
+    
+    for (size_t i = 0; i < knn_matches.size(); i++) 
+        if ((knn_matches[i].size() > 1) && (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance))
+            freq[intr_state->imgs.ids[i]]++;
+
+    std::vector<std::pair<size_t, size_t>> freq_vec(freq.begin(), freq.end());
 
     std::sort(freq_vec.begin(), freq_vec.end(), imp__ri_freq_compare);
 
