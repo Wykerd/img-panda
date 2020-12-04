@@ -15,8 +15,8 @@ extern "C" {
 #include "common.h"
 
 typedef enum imp_db_con {
-    IMP_RI_DB_SQLITE,
-    IMP_RI_DB_POSTGRES
+    IMP_RI_DB_SQLITE = 0,
+    IMP_RI_DB_POSTGRES = 1
 } imp_db_con_t;
 
 typedef struct imp_db_s {

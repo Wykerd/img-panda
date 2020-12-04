@@ -30,7 +30,7 @@ static cv::Mat imp__ri_load_grayscale (imp_buf_t *buf, size_t max_area = -1) {
 };
 
 static imp_ri_kpdesc_t imp__ri_compute_descriptor (cv::Mat &src) {
-    cv::Ptr<cv::BRISK> detector = cv::BRISK::create(80);
+    cv::Ptr<cv::BRISK> detector = cv::BRISK::create(120);
     std::vector<cv::KeyPoint> kp;
     cv::Mat desc;
     detector->detectAndCompute(src, cv::noArray(), kp, desc);
@@ -126,6 +126,11 @@ void imp_ri_match_free (imp_ri_matches_t *matches) {
     free(matches->idx);
     free(matches);
 };
+
+const char* imp_ri_get_uri_from_id (imp_ri_state_t *state, size_t id) {
+    imp_ri_intr_state_t *intr_s = static_cast<imp_ri_intr_state_t *>(state->data);
+    return intr_s->imgs.uris[id - 1].c_str(); // id is 1 index in db and 0 index in vector
+}
 
 int imp_ri_state_load (imp_ri_state_t *state) {
     imp_ri_intr_state_t *intr_s = static_cast<imp_ri_intr_state_t *>(state->data);

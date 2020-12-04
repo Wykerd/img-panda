@@ -51,6 +51,10 @@ imp_ri_matches_t *imp_ri_match_img (imp_ri_state_t *state, imp_buf_t *img, size_
  * Free results of imp_ri_matches_t*
  */
 void imp_ri_match_free (imp_ri_matches_t *matches);
+/**
+ * Get the image uri from id
+ */
+const char* imp_ri_get_uri_from_id (imp_ri_state_t *state, size_t id);
 
 /// Appending
 /** 
