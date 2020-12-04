@@ -39,12 +39,21 @@ static void imp__ri_build_dist_matrix (imp_ri_intr_state_t *intr_s) {
     size_t rows_per_worker = intr_s->imgs.ids_len / intr_s->jobs,
            row_offset = 0;
 
+    if (rows_per_worker == 0)
+        rows_per_worker = 1;
+
     for (size_t i = 0; i < intr_s->jobs - 1; i++) {
-        intr_s->dist_matrix.push_back(intr_s->imgs.matrix.rowRange(row_offset, row_offset + rows_per_worker));
+        if (row_offset >= intr_s->imgs.ids_len)
+            intr_s->dist_matrix.push_back(cv::Mat());
+        else
+            intr_s->dist_matrix.push_back(intr_s->imgs.matrix.rowRange(row_offset, row_offset + rows_per_worker));
         row_offset += rows_per_worker;
     };
 
-    intr_s->dist_matrix.push_back(intr_s->imgs.matrix.rowRange(row_offset, intr_s->imgs.ids_len));
+    if (row_offset > intr_s->imgs.ids_len)
+        intr_s->dist_matrix.push_back(cv::Mat());
+    else 
+        intr_s->dist_matrix.push_back(intr_s->imgs.matrix.rowRange(row_offset, intr_s->imgs.ids_len));
 }
 
 static imp_ri_kpdesc_t imp__ri_compute_descriptor (cv::Mat &src) {
