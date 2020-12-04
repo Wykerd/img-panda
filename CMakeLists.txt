@@ -10,9 +10,7 @@ file(DOWNLOAD https://raw.githubusercontent.com/simdjson/simdjson/master/singleh
 
 add_subdirectory(deps/lexbor)
 
-add_executable(ripper
-    src/main.c
-    
+add_library(imp SHARED
     # Comics
     src/comics/index.c
     src/comics/identify/metadata.c
@@ -46,7 +44,11 @@ add_executable(ripper
     deps/hashmap/hashmap.c
 )
 
-set_target_properties(ripper PROPERTIES
+add_executable(ripper
+    src/main.c
+)
+
+set_target_properties(imp PROPERTIES
     C_STANDARD 11
     C_STANDARD_REQUIRED ON
 )
@@ -70,7 +72,9 @@ include_directories(
     ${SQLite3_INCLUDE_DIRS}
 )
 
-target_link_libraries(ripper 
+target_link_libraries(ripper imp)
+
+target_link_libraries(imp 
     # Parsers
     lexbor # HTML
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/llhttp/build/libllhttp.a # HTTP
