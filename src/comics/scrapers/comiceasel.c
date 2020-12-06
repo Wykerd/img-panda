@@ -79,7 +79,9 @@ imp_wc_err_t imp_wc_comic_easel_chapter_page (imp_wc_indexer_state_t *state, lxb
         imp_url_t *url = imp_parse_url(href_attr->value->data, href_attr->value->length);
         if (url == NULL) continue;
 
-        imp_wc_meta_strip_t **pstrip = hashmap_get(state->content, &(imp_wc_meta_strip_t){ .src_url = url });
+        imp_wc_meta_strip_t *match = &(imp_wc_meta_strip_t){ .src_url = url };
+
+        imp_wc_meta_strip_t **pstrip = hashmap_get(state->content, &match);
         imp_wc_meta_strip_t *strip;
         if (pstrip == NULL) {
             strip = malloc(sizeof(imp_wc_meta_strip_t));
@@ -242,11 +244,13 @@ imp_wc_err_t imp_wc_comic_easel_scrape (imp_wc_indexer_state_t *state, lxb_html_
     lxb_status_t status;
     imp_wc_err_t err = E_WC_OK;
 
-    imp_wc_meta_strip_t **pstrip = hashmap_get(state->content, &(imp_wc_meta_strip_t){ .src_url = url });
+
+    imp_wc_meta_strip_t *match = &(imp_wc_meta_strip_t){ .src_url = url };
+    imp_wc_meta_strip_t **pstrip = hashmap_get(state->content, &match);
 
     imp_wc_meta_strip_t *strip;
 
-    if ((*pstrip != NULL) && (*pstrip)->is_scraped)
+    if ((pstrip != NULL) && (*pstrip)->is_scraped)
         return E_WC_OK;
 
     if (pstrip == NULL) {
@@ -439,8 +443,9 @@ static void imp__push_chapter (imp_wc_indexer_state_t *state, lxb_dom_attr_t *hr
     };
     size_t id_len = strlen(tok);
     
+    imp_wc_meta_chapter_t *match = &(imp_wc_meta_chapter_t){ .id = tok, .id_len = id_len };
     imp_wc_meta_chapter_t *chap;
-    imp_wc_meta_chapter_t **pchap = hashmap_get(state->chapters, &(imp_wc_meta_chapter_t){ .id = tok, .id_len = id_len });
+    imp_wc_meta_chapter_t **pchap = hashmap_get(state->chapters, &match);
     
     if (pchap == NULL)
         chap = calloc(1, sizeof(imp_wc_meta_chapter_t));

@@ -124,8 +124,8 @@ fail:
 };
 
 static int imp__strip_cmp(const void *a, const void *b, void *udata) {
-    const imp_wc_meta_strip_t *sa = *(imp_wc_meta_strip_t **)a;
-    const imp_wc_meta_strip_t *sb = *(imp_wc_meta_strip_t **)b;
+    imp_wc_meta_strip_t *sa = *(imp_wc_meta_strip_t **)a;
+    imp_wc_meta_strip_t *sb = *(imp_wc_meta_strip_t **)b;
 
     return strcmp(sa->src_url->fragment, sb->src_url->fragment) &&
     strcmp(sa->src_url->host, sb->src_url->host) &&
@@ -137,7 +137,7 @@ static int imp__strip_cmp(const void *a, const void *b, void *udata) {
 }
 
 static uint64_t imp__strip_hash(const void *item, uint64_t seed0, uint64_t seed1) {
-    const imp_wc_meta_strip_t *strip = *(imp_wc_meta_strip_t **)item;
+    imp_wc_meta_strip_t *strip = *(imp_wc_meta_strip_t **)item;
     const char *format = "%s%s%s%s%s%s";
     int len;
     len = snprintf(NULL, 0, format, 
@@ -167,13 +167,13 @@ static uint64_t imp__strip_hash(const void *item, uint64_t seed0, uint64_t seed1
 }
 
 static int imp__chapter_cmp(const void *a, const void *b, void *udata) {
-    const imp_wc_meta_chapter_t **ua = a;
-    const imp_wc_meta_chapter_t **ub = b;
+    imp_wc_meta_chapter_t **ua = a;
+    imp_wc_meta_chapter_t **ub = b;
     return strcmp((*ua)->id, (*ub)->id);
 }
 
 static uint64_t imp__chapter_hash(const void *item, uint64_t seed0, uint64_t seed1) {
-    const imp_wc_meta_chapter_t *chapter = *(imp_wc_meta_chapter_t **)item;
+    imp_wc_meta_chapter_t *chapter = *(imp_wc_meta_chapter_t **)item;
     return hashmap_sip(chapter->id, chapter->id_len, seed0, seed1);
 }
 
@@ -251,8 +251,34 @@ int imp_wc_indexer_run (
 
     return 1;
 }
-/*
-int imp_wc_indexer_shutdown (imp_wc_indexer_state_t *state) {
-    hashmap_scan
+
+bool imp__strip_free_iter (const void *item, void *udata) {
+    imp_wc_meta_strip_t *strip = *(imp_wc_meta_strip_t **)item;
+    imp_wc_meta_strip_free(strip);
+    free(strip);
+
+    return 1;
 }
-*/
+
+bool imp__chapter_free_iter (const void *item, void *udata) {
+    imp_wc_meta_chapter_t *chapter = *(imp_wc_meta_chapter_t **)item;
+    free(chapter->name);
+    free(chapter->id);
+    imp_url_free(chapter->url);
+    free(chapter);
+
+    return 1;
+}
+
+int imp_wc_indexer_shutdown (imp_wc_indexer_state_t *state) {
+    hashmap_scan(state->content, imp__strip_free_iter, NULL);
+    hashmap_scan(state->chapters, imp__chapter_free_iter, NULL);
+
+    imp_wc_meta_index_free(&state->metadata);
+
+    imp_url_free(state->url);
+
+    imp_http_pool_shutdown(&state->pool);
+
+    free(state);
+};

@@ -15,6 +15,15 @@ int imp_wc_meta_index_init (imp_wc_meta_index_t *page) {
     return 1;
 };
 
+void imp_wc_meta_strip_free (imp_wc_meta_strip_t *page) {
+    imp_url_free(page->src_url);
+    imp_url_free(page->img_url);
+    imp_url_free(page->next_url);
+    imp_url_free(page->previous_url);
+    free(page->img_title.data.base);
+    free(page->img_desc.data.base);
+}
+
 int imp_wc_meta_strip_init (imp_wc_meta_strip_t *page) {
     memset(page, 0, sizeof(imp_wc_meta_strip_t));
     page->img_title.data.base = malloc(1);
@@ -33,19 +42,6 @@ void imp_wc_meta_index_free (imp_wc_meta_index_t *page) {
     if (page->last_url != NULL)
         imp_url_free(page->last_url);
 };
-
-void imp_wc_meta_strip_free (imp_wc_meta_strip_t *page) {
-    free(page->img_title.data.base);
-    free(page->img_desc.data.base);
-
-    if (page->next_url != NULL)
-        imp_url_free(page->next_url);
-    if (page->previous_url != NULL)
-        imp_url_free(page->previous_url);
-    if (page->img_url != NULL)
-        imp_url_free(page->img_url);
-};
-
 
 inline
 static imp_wc_err_t imp__comic_logo_locate (imp_wc_meta_index_t *page, lxb_html_document_t *document, imp_url_t* url) {

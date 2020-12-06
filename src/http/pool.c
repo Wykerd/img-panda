@@ -393,7 +393,4 @@ void imp_http_pool_shutdown (imp_http_pool_t *pool) {
 
     free(pool->idle_workers.workers);
     free(pool->working_workers.workers);
-
-    free(pool);
-    pool = NULL;
 };

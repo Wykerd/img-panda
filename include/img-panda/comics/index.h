@@ -43,6 +43,8 @@ int imp_wc_get_chapter (imp_wc_indexer_state_t *state, imp_scraper_func scraper)
 
 int imp_wc_indexer_init (uv_loop_t *loop, imp_wc_indexer_state_t *state);
 int imp_wc_indexer_run (imp_wc_indexer_state_t *state, const char* url, const size_t url_len, imp_wc_indexer_cb on_complete);
+// this is async as the underlying http pool is shutdown async too
+int imp_wc_indexer_shutdown (imp_wc_indexer_state_t *state);
 
 #ifdef __cplusplus
 }

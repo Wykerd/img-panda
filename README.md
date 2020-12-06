@@ -1,5 +1,5 @@
 # Image Panda
-## An image utility engine for content identification and manipulation
+An image utility engine for content identification and manipulation.
 
 # Features
 
@@ -19,6 +19,9 @@
 
 ## Toolchain
 - `CMake` 3.11 or later
-- `gcc` version supporting c11 and c++14
+- C/C++ compiler supporting c11 and c++14
 - `NodeJS` (for llhttp)
 - `npm` (for llhttp)
+
+# Building
+Currently only tested on GNU/Linux.
