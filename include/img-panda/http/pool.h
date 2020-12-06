@@ -79,6 +79,7 @@ int imp_http_pool_init (uv_loop_t *loop, imp_http_pool_t *pool, size_t worker_co
 
 int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *request);
 
+// Shutdown of individual workers happen async
 void imp_http_pool_shutdown (imp_http_pool_t *pool);
 
 #define imp_http_pool_default_headers(x) \

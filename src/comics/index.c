@@ -124,8 +124,8 @@ fail:
 };
 
 static int imp__strip_cmp(const void *a, const void *b, void *udata) {
-    const imp_wc_meta_strip_t *sa = a;
-    const imp_wc_meta_strip_t *sb = b;
+    const imp_wc_meta_strip_t *sa = *(imp_wc_meta_strip_t **)a;
+    const imp_wc_meta_strip_t *sb = *(imp_wc_meta_strip_t **)b;
 
     return strcmp(sa->src_url->fragment, sb->src_url->fragment) &&
     strcmp(sa->src_url->host, sb->src_url->host) &&
@@ -137,7 +137,7 @@ static int imp__strip_cmp(const void *a, const void *b, void *udata) {
 }
 
 static uint64_t imp__strip_hash(const void *item, uint64_t seed0, uint64_t seed1) {
-    const imp_wc_meta_strip_t *strip = item;
+    const imp_wc_meta_strip_t *strip = *(imp_wc_meta_strip_t **)item;
     const char *format = "%s%s%s%s%s%s";
     int len;
     len = snprintf(NULL, 0, format, 
@@ -167,13 +167,13 @@ static uint64_t imp__strip_hash(const void *item, uint64_t seed0, uint64_t seed1
 }
 
 static int imp__chapter_cmp(const void *a, const void *b, void *udata) {
-    const imp_wc_meta_chapter_t *ua = a;
-    const imp_wc_meta_chapter_t *ub = b;
-    return strcmp(ua->id, ub->id);
+    const imp_wc_meta_chapter_t **ua = a;
+    const imp_wc_meta_chapter_t **ub = b;
+    return strcmp((*ua)->id, (*ub)->id);
 }
 
 static uint64_t imp__chapter_hash(const void *item, uint64_t seed0, uint64_t seed1) {
-    const imp_wc_meta_chapter_t *chapter = item;
+    const imp_wc_meta_chapter_t *chapter = *(imp_wc_meta_chapter_t **)item;
     return hashmap_sip(chapter->id, chapter->id_len, seed0, seed1);
 }
 
@@ -202,13 +202,6 @@ static void imp__wc_comic_dl (imp_http_worker_t *worker, imp_http_pool_t *pool) 
     imp_wc_meta_strip_t *strip = worker->last_request_data;
     if (state->on_strip_image != NULL)
         state->on_strip_image(state, strip, (uv_buf_t *)&worker->last_response);
-    FILE *fd;
-    char *fpath = calloc(sizeof(char), 60);
-    snprintf(fpath, 60, "/home/wykerd/sources/comic-rip/imgs/%d.png", count++);
-    fd = fopen(fpath, "w");
-    fwrite(worker->last_response.base, 1, worker->last_response.len, fd);
-    fclose(fd);
-    free(fpath);
 }
 
 int imp_wc_download_image (imp_wc_indexer_state_t *state, imp_wc_meta_strip_t *strip) {
@@ -258,3 +251,8 @@ int imp_wc_indexer_run (
 
     return 1;
 }
+/*
+int imp_wc_indexer_shutdown (imp_wc_indexer_state_t *state) {
+    hashmap_scan
+}
+*/
