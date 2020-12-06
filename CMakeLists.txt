@@ -51,6 +51,8 @@ add_executable(ripper
 set_target_properties(imp PROPERTIES
     C_STANDARD 11
     C_STANDARD_REQUIRED ON
+    CXX_STANDARD 14
+    CXX_STANDARD_REQUIRED ON
 )
 
 find_package(OpenSSL REQUIRED)
@@ -59,7 +61,7 @@ find_package(OpenCV REQUIRED core imgproc imgcodecs features2d)
 find_package(SQLite3 REQUIRED)
 find_package(Threads REQUIRED)
 
-include_directories(
+target_include_directories(imp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include 
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/lexbor/source
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/llhttp/build
