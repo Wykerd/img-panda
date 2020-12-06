@@ -14,8 +14,6 @@ void imp_http_client_parse_read (imp_http_client_t* client, const uv_buf_t *buf)
         };
 
         client->status_cb(client, &error);
-
-        exit(1);
     }
 
     if (client->parser.upgrade == 1) {
@@ -854,7 +852,7 @@ uv_buf_t *imp_http_request_header_with_path (imp_http_request_t *req, imp_url_pa
 
             char *b64_buf = calloc(sizeof(char), b64_len);
 
-            if (base64_encode(path->userinfo, userinfo_len, b64_buf, b64_len, FA_B64_MODE_NORMAL)) goto skip_auth;
+            if (!base64_encode(path->userinfo, userinfo_len, b64_buf, b64_len, FA_B64_MODE_NORMAL)) goto skip_auth;
 
             uv_buf_t field = {
                 .base = "Authorization",

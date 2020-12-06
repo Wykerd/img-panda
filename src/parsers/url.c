@@ -178,6 +178,7 @@ imp_url_t *imp_url_dup (imp_url_t *url) {
 }
 
 void imp_url_free (imp_url_t *url) {
+    if (url == NULL) return;
     url->ref--;
     if (url->ref == 0) {
         free(url->schema);
