@@ -105,6 +105,7 @@ static void imp__pool_client_status_cb (imp_http_client_t *client, imp_net_statu
 static void imp__wc_on_close_redirect (uv_handle_t* handle) {
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
     printf("<<< Redirecting to: %s\n\n", state->redirect_url->host);
+    imp_url_free(state->client.url);
     state->client.url = state->redirect_url;
     if (imp_http_client_connect (&state->client, *imp__pool_client_status_cb, imp__http_pool_ready_cb)) {
         // TODO: EXIT NO SHUTDOWN
@@ -361,4 +362,38 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
     };
 };
 
-void imp_http_pool_shutdown (imp_http_pool_t *pool);
+static void imp__pool_on_close_sht (uv_handle_t* handle) {
+    imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
+
+    if (state->last_request_buf != NULL) 
+        imp_http_request_serialize_free(state->last_request_buf);
+
+    free(state->last_response.base);
+
+    imp_url_free(state->redirect_url);
+    free(state);
+}
+
+void imp_http_pool_shutdown (imp_http_pool_t *pool) {
+    for (size_t i = 0; i < pool->pool_size; i++) {
+        if (pool->idle_workers.workers[i] != NULL) {
+            imp_http_client_shutdown(&pool->idle_workers.workers[i]->client, imp__pool_on_close_sht);
+        } else if (pool->working_workers.workers[i] != NULL) {
+            imp_http_client_shutdown(&pool->working_workers.workers[i]->client, imp__pool_on_close_sht);
+        }
+    };
+
+    for (size_t i = 0; i < pool->queue_len; i++) {
+        imp_http_request_free(pool->queue[i]->request);
+        imp_url_free(pool->queue[i]->url);
+        free(pool->queue[i]);
+    };
+
+    free(pool->queue);
+
+    free(pool->idle_workers.workers);
+    free(pool->working_workers.workers);
+
+    free(pool);
+    pool = NULL;
+};
