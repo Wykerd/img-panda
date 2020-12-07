@@ -21,6 +21,7 @@ static void imp__http_pool_write_cb (imp_http_client_t *client, imp_net_status_t
         imp__http_pool_kill_worker(state, err);
     };
     imp_http_request_serialize_free(state->last_request_buf);
+    state->last_request_buf = NULL;
 };
 
 static int imp__wc_on_status_recv (llhttp_t* parser, const char *at, size_t length) {
@@ -138,8 +139,11 @@ static imp_http_worker_t *imp__http_pool_set_idle (imp_http_pool_t *pool, imp_ht
 
 static void imp__wc_on_close_idle (uv_handle_t* handle) {
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
-    if (!state->is_idle)
+    if (!state->is_idle) {
+        if (state->last_request != NULL)
+            imp_http_request_free(state->last_request);
         imp__http_pool_set_idle(state->pool, state);
+    }
 }
 
 int imp__pool_on_message_complete (llhttp_t* parser) {
@@ -194,12 +198,16 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
         state->pool->queue[state->pool->queue_len - 1] = NULL;
         state->pool->queue_len--;
         goto cleanup;
-    } 
-
-    state = imp__http_pool_set_idle(state->pool, state);
+    }
     // free the request - we have handled it now
     imp_http_request_free(state->last_request);
-    
+    state->last_request = NULL;
+    // reset the buffer
+    state->last_response.len = 0;
+
+    state = imp__http_pool_set_idle(state->pool, state);
+
+    return 0;
 cleanup:
     // reset the buffer
     state->last_response.len = 0;
