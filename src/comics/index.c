@@ -6,6 +6,19 @@
 #include <lexbor/dom/interfaces/element.h>
 #include <string.h>
 
+static void imp__wc_fatal_error_cb (imp_http_worker_t *worker, imp_net_status_t *status) {
+    imp_wc_indexer_state_t *state = worker->pool->data;
+
+    state->on_complete(state, status);
+};
+
+static void imp__wc_error_cb (imp_http_worker_t *worker, imp_net_status_t *status) {
+    imp_wc_indexer_state_t *state = worker->pool->data;
+
+    if (state->on_error != NULL)
+        state->on_error(state, status);
+};
+
 static void imp__wc_initial_easel_page_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
     puts(">>> GOT LATEST COMIC PAGE");
     imp_wc_indexer_state_t* state = pool->data;
@@ -69,6 +82,7 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
             req->request = http_req;
 
             req->on_response = imp__wc_ident_wordpress_cb;
+            req->on_error = imp__wc_error_cb;
 
             imp_http_pool_request(&state->pool, req);
 
@@ -86,6 +100,8 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
                     req->url->path = strdup("/");
                     free(req->url->query);
                     req->url->query = strdup("latest");
+
+                    req->on_error = imp__wc_error_cb;
 
                     imp_http_request_t *http_req = imp_http_request_init("GET");
 
@@ -222,6 +238,8 @@ int imp_wc_download_image (imp_wc_indexer_state_t *state, imp_wc_meta_strip_t *s
 
     req->on_response = imp__wc_comic_dl;
 
+    req->on_error = imp__wc_error_cb;
+
     imp_http_pool_request(&state->pool, req);
 }
 
@@ -230,6 +248,7 @@ int imp_wc_indexer_run (
     const char* url, const size_t url_len, 
     imp_wc_indexer_cb on_complete
 ) {
+    state->on_complete = on_complete;
 
     imp_http_worker_request_t *req = malloc(sizeof(imp_http_worker_request_t));
     memset(req, 0, sizeof(imp_http_worker_request_t));
@@ -245,7 +264,7 @@ int imp_wc_indexer_run (
     req->request = http_req;
 
     req->on_response = imp__wc_identify_cb;
-    // req->on_complete
+    req->on_error = imp__wc_fatal_error_cb;
 
     imp_http_pool_request(&state->pool, req);
 

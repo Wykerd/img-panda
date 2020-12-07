@@ -13,7 +13,7 @@ extern "C" {
 
 typedef struct imp_wc_indexer_state_s imp_wc_indexer_state_t;
 
-typedef void (*imp_wc_indexer_cb)(imp_wc_indexer_state_t *state, int status, int errcode);
+typedef void (*imp_wc_indexer_cb)(imp_wc_indexer_state_t *state, imp_net_status_t *status);
 
 typedef void (*imp_wc_indexer_status_cb)(imp_wc_indexer_state_t *state);
 typedef void (*imp_wc_indexer_strip_imgdl_cb)(imp_wc_indexer_state_t *state, imp_wc_meta_strip_t *strip, uv_buf_t *img);
@@ -26,6 +26,7 @@ struct imp_wc_indexer_state_s {
 
     // Events
     imp_wc_indexer_cb on_complete;
+    imp_wc_indexer_cb on_error;
     imp_wc_indexer_strip_imgdl_cb on_strip_image;
 
     // State
