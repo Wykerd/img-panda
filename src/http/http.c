@@ -461,6 +461,14 @@ static void imp__http_client_tcp_connect_cb (
     int r;
 
     if (!strcmp(client->url->schema, "https")) {
+        // reset ssl if client was used before
+        if (client->ssl != NULL) {
+            SSL_free(client->ssl);
+            if (client->tls_ctx != NULL) {
+                SSL_CTX_free(client->tls_ctx);
+            };
+        }
+
         // Setup OpenSSL session
         const SSL_METHOD *meth;
         
