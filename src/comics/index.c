@@ -36,7 +36,13 @@ static void imp__wc_initial_easel_page_cb (imp_http_worker_t *worker, imp_http_p
     imp_wc_comic_easel_crawl(state, document, worker->client.url);
 
 fail:
-    // TODO FAIL
+    imp_net_status_t status = {
+        .type = FA_NET_E_UNKNOWN,
+        .code = -1
+    };
+
+    state->on_complete(state, &status);
+
     lxb_html_document_destroy(document);
 }
 
@@ -47,11 +53,26 @@ static void imp__wc_ident_wordpress_cb (imp_http_worker_t *worker, imp_http_pool
     imp_parse_wordpress_site_info_json(&state->metadata, (imp_buf_t *)&worker->last_response);
 }
 
+static void imp__wc_detect_complete (imp_http_worker_t *worker, imp_http_pool_t *pool) {
+    imp_wc_indexer_state_t* state = pool->data;
+
+    if (pool->idle_workers.len == pool->pool_size) {
+        imp_net_status_t status = {
+            .type = FA_NET_E_OK,
+            .code = 0
+        };
+
+        state->on_complete(state, &status);
+    };
+}
+
 static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
     puts(">>> IDENTIFYING");
     lxb_status_t status;
     lxb_html_document_t *document;
     imp_wc_indexer_state_t* state = pool->data;
+
+    pool->on_state_change = imp__wc_detect_complete;
 
     document = lxb_html_document_create();
     if (document == NULL)
@@ -101,7 +122,7 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
                     free(req->url->query);
                     req->url->query = strdup("latest");
 
-                    req->on_error = imp__wc_error_cb;
+                    req->on_error = imp__wc_fatal_error_cb;
 
                     imp_http_request_t *http_req = imp_http_request_init("GET");
 
@@ -125,6 +146,13 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
         {
             // TODO: SEARCH FOR ROIs
             puts("FAILED: MANUAL IDENT");
+
+            imp_net_status_t status = {
+                .type = FA_NET_E_UNKNOWN,
+                .code = -2
+            };
+
+            state->on_complete(state, &status);
         }
         break;
     }
@@ -135,7 +163,13 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
 
     return;
 fail:
-    // TODO FAIL
+    imp_net_status_t status = {
+        .type = FA_NET_E_UNKNOWN,
+        .code = -1
+    };
+
+    state->on_complete(state, &status);
+
     lxb_html_document_destroy(document);
 };
 

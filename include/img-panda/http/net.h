@@ -16,6 +16,7 @@ typedef struct imp_tcp_client_s imp_tcp_client_t;
 
 enum imp_net_err_type {
     FA_NET_E_OK, // Success.
+    FA_NET_E_UNKNOWN,
     FA_NET_NOT_2XX, // Status is not 2XX
     FA_NET_E_GETADDRINFO, // Failed to resolve host.
     FA_NET_E_TCP_INIT, // Failed to initialize TCP handle.
