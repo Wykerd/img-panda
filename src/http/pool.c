@@ -93,28 +93,19 @@ int imp__wc_on_header_value (llhttp_t* parser, const char *at, size_t length) {
     return 0;
 }
 
-static void imp__pool_client_status_cb (imp_http_client_t *client, imp_net_status_t *err) {
-    if (err->type != FA_NET_E_OK) {
-        char buf[256] = {0};
-        ERR_error_string(ERR_get_error(), buf);
-        printf("!!! Status %d %ld %s\n\n", err->type, err->code, buf);
-        // TODO
-    };
-};
-
 static void imp__wc_on_close_redirect (uv_handle_t* handle) {
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
     printf("<<< Redirecting to: %s\n\n", state->redirect_url->host);
     imp_url_free(state->client.url);
     state->client.url = state->redirect_url;
-    if (imp_http_client_connect (&state->client, *imp__pool_client_status_cb, imp__http_pool_ready_cb)) {
+    if (imp_http_client_connect (&state->client, imp__http_pool_status_cb, imp__http_pool_ready_cb)) {
         // TODO: EXIT NO SHUTDOWN
     };
 };
 
 static void imp__pool_on_close_new_host (uv_handle_t* handle) {
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
-    if (imp_http_client_connect (&state->client, *imp__pool_client_status_cb, imp__http_pool_ready_cb)) {
+    if (imp_http_client_connect (&state->client, imp__http_pool_status_cb, imp__http_pool_ready_cb)) {
         // TODO: EXIT NO SHUTDOWN
     };
 };
