@@ -1,4 +1,6 @@
 # Image Panda
+![Logo](img-panda.png)
+
 An image utility engine for content identification and manipulation.
 
 # Features
