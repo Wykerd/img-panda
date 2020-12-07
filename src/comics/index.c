@@ -36,6 +36,8 @@ static void imp__wc_initial_easel_page_cb (imp_http_worker_t *worker, imp_http_p
 
     imp_wc_comic_easel_crawl(state, document, worker->client.url);
 
+    lxb_html_document_destroy(document);
+    return;
 fail:
     lxb_html_document_destroy(document);
 
@@ -333,6 +335,4 @@ int imp_wc_indexer_shutdown (imp_wc_indexer_state_t *state) {
     imp_url_free(state->url);
 
     imp_http_pool_shutdown(&state->pool);
-
-    free(state);
 };
