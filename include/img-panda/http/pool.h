@@ -68,6 +68,9 @@ typedef struct imp_http_pool_s {
     imp_http_worker_list_t idle_workers;
     size_t pool_size;
 
+    // This callback is called when a worker moves into another state (idle <-> working)
+    imp_http_pool_status_cb on_state_change;
+
     imp_http_worker_request_t **queue;
     size_t queue_len;
     size_t queue_size;

@@ -127,6 +127,8 @@ static int imp__http_pool_set_working (imp_http_pool_t *pool, imp_http_worker_t 
     pool->idle_workers.workers[idle->pos] = NULL;
     pool->idle_workers.len--;
     pool->working_workers.len++;
+    if (pool->on_state_change != NULL)
+        pool->on_state_change(pool->working_workers.workers[idle->pos], pool);
     return 1;
 }
 
@@ -138,6 +140,8 @@ static imp_http_worker_t *imp__http_pool_set_idle (imp_http_pool_t *pool, imp_ht
     pool->working_workers.workers[work->pos] = NULL;
     pool->working_workers.len--;
     pool->idle_workers.len++;
+    if (pool->on_state_change != NULL)
+        pool->on_state_change(pool->idle_workers.workers[work->pos], pool);
     return pool->idle_workers.workers[work->pos];
 }
 
