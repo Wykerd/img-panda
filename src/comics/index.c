@@ -1,4 +1,5 @@
 // Generate a index for a web comic
+// TODO NULL CHECKS
 #include "img-panda/comics/index.h"
 #include "img-panda/comics/identify/wordpress.h"
 #include "img-panda/comics/scrapers/comiceasel.h"
@@ -36,14 +37,14 @@ static void imp__wc_initial_easel_page_cb (imp_http_worker_t *worker, imp_http_p
     imp_wc_comic_easel_crawl(state, document, worker->client.url);
 
 fail:
-    imp_net_status_t status = {
+    lxb_html_document_destroy(document);
+
+    imp_net_status_t ret_status = {
         .type = FA_NET_E_UNKNOWN,
         .code = -1
     };
 
-    state->on_complete(state, &status);
-
-    lxb_html_document_destroy(document);
+    state->on_complete(state, &ret_status);
 }
 
 static void imp__wc_ident_wordpress_cb (imp_http_worker_t *worker, imp_http_pool_t *pool) {
@@ -163,14 +164,14 @@ static void imp__wc_identify_cb (imp_http_worker_t *worker, imp_http_pool_t *poo
 
     return;
 fail:
-    imp_net_status_t status = {
+    lxb_html_document_destroy(document);
+
+    imp_net_status_t ret_status = {
         .type = FA_NET_E_UNKNOWN,
         .code = -1
     };
 
-    state->on_complete(state, &status);
-
-    lxb_html_document_destroy(document);
+    state->on_complete(state, &ret_status);
 };
 
 static int imp__strip_cmp(const void *a, const void *b, void *udata) {
@@ -217,9 +218,9 @@ static uint64_t imp__strip_hash(const void *item, uint64_t seed0, uint64_t seed1
 }
 
 static int imp__chapter_cmp(const void *a, const void *b, void *udata) {
-    imp_wc_meta_chapter_t **ua = a;
-    imp_wc_meta_chapter_t **ub = b;
-    return strcmp((*ua)->id, (*ub)->id);
+    imp_wc_meta_chapter_t *ua = *(imp_wc_meta_chapter_t **)a;
+    imp_wc_meta_chapter_t *ub = *(imp_wc_meta_chapter_t **)b;
+    return strcmp(ua->id, ub->id);
 }
 
 static uint64_t imp__chapter_hash(const void *item, uint64_t seed0, uint64_t seed1) {
