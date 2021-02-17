@@ -35,6 +35,7 @@ struct imp_http_worker_s {
     uv_buf_t *last_request_body;
     void* last_request_data;
     imp_reusable_buf_t last_response;
+    imp_net_status_t last_error;
 
     // Status
     int working;
@@ -70,6 +71,7 @@ typedef struct imp_http_pool_s {
 
     // This callback is called when a worker moves into another state (idle <-> working)
     imp_http_pool_status_cb on_state_change;
+    imp_http_pool_err_cb on_error_default;
 
     imp_http_worker_request_t **queue;
     size_t queue_len;

@@ -8,6 +8,7 @@
 #include <string.h>
 
 static void imp__wc_fatal_error_cb (imp_http_worker_t *worker, imp_net_status_t *status) {
+    puts("!!! FATAL ERROR");
     imp_wc_indexer_state_t *state = worker->pool->data;
 
     state->on_complete(state, status);
@@ -239,6 +240,8 @@ int imp_wc_indexer_init (
     state->loop = loop;
 
     imp_http_pool_init(loop, &state->pool, 20);  
+
+    state->pool.on_error_default = imp__wc_fatal_error_cb;
 
     state->pool.data = state;  
 

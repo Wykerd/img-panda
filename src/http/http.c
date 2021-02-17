@@ -128,7 +128,9 @@ free_ssl:
             SSL_CTX_free(client->tls_ctx);
         };
 
-        uv_tcp_close_reset(&client->tcp, client->tls_close_cb);
+        int err = uv_tcp_close_reset(&client->tcp, client->tls_close_cb);
+        if (err)
+            client->tls_close_cb((uv_handle_t *)&client->tcp);
         return;
     }
 }
@@ -144,6 +146,9 @@ void imp_http_client_shutdown (imp_http_client_t *client, uv_close_cb close_cb) 
         client->url = NULL;
     }
 
+    client->tcp.data = client;
+
+    int err = 0;
     if (client->ssl != NULL) {
         uv_poll_stop(&client->tls_poll);
 
@@ -155,9 +160,12 @@ void imp_http_client_shutdown (imp_http_client_t *client, uv_close_cb close_cb) 
 
         client->tls_close_cb = close_cb;
 
-        uv_idle_start(sht, imp__http_client_tls_shutdown_cb);
+        err = uv_idle_start(sht, imp__http_client_tls_shutdown_cb);
     } else {
-        uv_tcp_close_reset(&client->tcp, close_cb);
+        err = uv_tcp_close_reset(&client->tcp, close_cb);
+    }
+    if (err) {
+        close_cb((uv_handle_t *)&client->tcp);
     }
 }
 

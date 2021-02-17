@@ -112,6 +112,8 @@ int imp_tcp_client_connect (imp_tcp_client_t *client, imp_tcp_client_status_cb s
     client->status_cb = status_cb;
     client->connect_cb = connect_cb;
 
+    client->tcp.data = client;
+
     if (unlikely(client->status_cb == NULL)) {
         return -1;
     };

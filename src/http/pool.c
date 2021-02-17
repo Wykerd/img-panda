@@ -4,14 +4,39 @@
 
 static void imp__wc_on_close_idle (uv_handle_t* handle);
 
+static void imp__error_close_async (uv_handle_t *handle) {
+
+    free(handle);
+}
+
+static void imp__error_send_async (uv_async_t* handle) {
+    imp_http_worker_t *state = handle->data;
+    if (state->on_error != NULL) 
+        state->on_error(state, &state->last_error);
+    else
+        state->pool->on_error_default(state, &state->last_error);
+
+    uv_close((uv_handle_t *)handle, imp__error_close_async);
+}
+
 inline
 static void imp__http_pool_kill_worker (imp_http_worker_t *state, imp_net_status_t *err) {
+    printf("!!! KILLING WORKER %p. WORKER IDLE %d. WORKER URL: %s. ERROR: %d\n", state, state->is_idle, state->client.url->path, err->type);
     state->is_connected = 0;
+
+    memcpy(&state->last_error, err, sizeof(imp_net_status_t));
+
+    int was_active = !state->is_idle;
+    
     imp_http_client_shutdown(&state->client, imp__wc_on_close_idle);
 
     // is not idle some error caused an issue
-    if (!state->is_idle && (state->on_error != NULL))
-        state->on_error(state, err);
+    if (was_active) {
+        uv_async_t *err_async = malloc(sizeof(uv_async_t));
+        uv_async_init(state->pool->loop, err_async, imp__error_send_async);
+        err_async->data = state;
+        uv_async_send(err_async);
+    }
 }
 
 static void imp__http_pool_write_cb (imp_http_client_t *client, imp_net_status_t *err) {
@@ -98,6 +123,7 @@ static void imp__wc_on_close_redirect (uv_handle_t* handle) {
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
     printf("<<< Redirecting to: %s\n\n", state->redirect_url->host);
     imp_url_free(state->client.url);
+    imp_http_client_init(handle->loop, &state->client);
     state->client.url = state->redirect_url;
     if (imp_http_client_connect (&state->client, imp__http_pool_status_cb, imp__http_pool_ready_cb)) {
         // TODO: EXIT NO SHUTDOWN
@@ -106,6 +132,8 @@ static void imp__wc_on_close_redirect (uv_handle_t* handle) {
 
 static void imp__pool_on_close_new_host (uv_handle_t* handle) {
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
+    imp_http_client_init(handle->loop, &state->client);
+    state->client.url = state->redirect_url;
     if (imp_http_client_connect (&state->client, imp__http_pool_status_cb, imp__http_pool_ready_cb)) {
         // TODO: EXIT NO SHUTDOWN
     };
@@ -139,6 +167,7 @@ static imp_http_worker_t *imp__http_pool_set_idle (imp_http_pool_t *pool, imp_ht
 
 static void imp__wc_on_close_idle (uv_handle_t* handle) {
     imp_http_worker_t *state = (imp_http_worker_t *)((imp_http_client_t *)handle->data)->data;
+    imp_http_client_init(state->pool->loop, &state->client);
     if (!state->is_idle) {
         if (state->last_request != NULL)
             imp_http_request_free(state->last_request);
@@ -189,7 +218,7 @@ int imp__pool_on_message_complete (llhttp_t* parser) {
         } else {
             // not same host close and reconnect
             imp_url_free(state->client.url);
-            state->client.url = req->url;
+            state->redirect_url = req->url;
             imp_http_client_shutdown(&state->client, imp__pool_on_close_new_host);
         }
 
@@ -345,8 +374,7 @@ int imp_http_pool_request (imp_http_pool_t *pool, imp_http_worker_request_t *req
                 if (pool->idle_workers.workers[i]->client.url != NULL)
                     imp_url_free(pool->idle_workers.workers[i]->client.url);
 
-                pool->idle_workers.workers[i]->client.url = request->url;
-                pool->idle_workers.workers[i]->last_request_body = request->body;
+                pool->idle_workers.workers[i]->redirect_url = request->url;
 
                 imp_http_client_shutdown (&pool->idle_workers.workers[i]->client, imp__pool_on_close_new_host);
 
@@ -380,6 +408,7 @@ static void imp__pool_on_close_sht (uv_handle_t* handle) {
 void imp_http_pool_shutdown (imp_http_pool_t *pool) {
     for (size_t i = 0; i < pool->pool_size; i++) {
         if (pool->idle_workers.workers[i] != NULL) {
+            imp_http_client_t *client = &pool->idle_workers.workers[i]->client;
             imp_http_client_shutdown(&pool->idle_workers.workers[i]->client, imp__pool_on_close_sht);
         } else if (pool->working_workers.workers[i] != NULL) {
             imp_http_client_shutdown(&pool->working_workers.workers[i]->client, imp__pool_on_close_sht);
