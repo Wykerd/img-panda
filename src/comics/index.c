@@ -332,6 +332,8 @@ bool imp__chapter_free_iter (const void *item, void *udata) {
 int imp_wc_indexer_shutdown (imp_wc_indexer_state_t *state) {
     hashmap_scan(state->content, imp__strip_free_iter, NULL);
     hashmap_scan(state->chapters, imp__chapter_free_iter, NULL);
+    hashmap_free(state->content);
+    hashmap_free(state->chapters);
 
     imp_wc_meta_index_free(&state->metadata);
 
